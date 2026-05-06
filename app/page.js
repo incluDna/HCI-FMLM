@@ -1,0 +1,866 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { scenarioDb, preferenceFactors } from "@/lib/scenarios";
+import {
+  computeTotals,
+  conditionForCounter,
+  findMainRoute,
+  findOption,
+  interfaceLabel,
+  interfacesForCondition,
+  makeParticipant,
+  seededShuffle,
+  storageGet,
+  storageSet
+} from "@/lib/experiment";
+
+const travelFreqOptions = ["ทุกวัน", "3–5 วันต่อสัปดาห์", "1–2 วันต่อสัปดาห์", "นาน ๆ ครั้ง"];
+const travelModes = [
+  ["walk", "🚶", "เดิน"],
+  ["bts", "🚇", "BTS"],
+  ["mrt", "🚊", "MRT"],
+  ["bus", "🚌", "รถเมล์"],
+  ["moto", "🏍️", "วินมอเตอร์ไซค์"],
+  ["taxi", "🚕", "Taxi/Grab"],
+  ["boat", "⛵", "เรือ"],
+  ["car", "🚗", "รถยนต์ส่วนตัว"],
+  ["bike", "🚲", "จักรยาน"],
+  ["other", "➕", "อื่น ๆ"]
+];
+const appUsageOptions = ["บ่อยมาก", "บางครั้ง", "นาน ๆ ครั้ง", "ไม่เคยใช้"];
+const satisfactionOptions = [
+  "แอป A ดีกว่ามาก",
+  "แอป A ดีกว่าเล็กน้อย",
+  "เท่ากัน",
+  "แอป B ดีกว่าเล็กน้อย",
+  "แอป B ดีกว่ามาก"
+];
+const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL || process.env.VITE_SHEET_URL || "";
+
+const initialBackground = { freq: "", modes: [], appUsage: "" };
+const initialSatisfaction = { better_decide: "", matches_pref: "", would_use: "", comment: "" };
+
+function defaultSelection(scenario) {
+  return {
+    selected_fm: scenario.first_mile[0]?.id || "",
+    selected_main: scenario.main_routes[0]?.id || "",
+    selected_lm: scenario.last_mile[0]?.id || "",
+    confidence: "",
+    clarity: ""
+  };
+}
+
+export default function StudyApp() {
+  const [ready, setReady] = useState(false);
+  const [participant, setParticipant] = useState(null);
+  const [screen, setScreen] = useState("consent");
+  const [background, setBackground] = useState(initialBackground);
+  const [ranking, setRanking] = useState(preferenceFactors);
+  const [scenarioIndex, setScenarioIndex] = useState(0);
+  const [interfaceIndex, setInterfaceIndex] = useState(0);
+  const [selections, setSelections] = useState({});
+  const [records, setRecords] = useState([]);
+  const [satisfaction, setSatisfaction] = useState(initialSatisfaction);
+  const [submitState, setSubmitState] = useState("idle");
+
+  useEffect(() => {
+    const saved = storageGet("fmlm_current_participant", null);
+    if (saved?.participant_id) {
+      setParticipant(saved);
+    } else {
+      const nextCounter = storageGet("fmlm_participant_counter", 0);
+      const created = {
+        participant_id: makeParticipant(nextCounter),
+        participant_counter: nextCounter,
+        condition_order: conditionForCounter(nextCounter),
+        created_at: new Date().toISOString()
+      };
+      storageSet("fmlm_participant_counter", nextCounter + 1);
+      storageSet("fmlm_current_participant", created);
+      setParticipant(created);
+    }
+
+    const adminScenarios = storageGet("fmlm_admin_scenarios", null);
+    if (!adminScenarios) storageSet("fmlm_admin_scenarios", scenarioDb);
+    setReady(true);
+  }, []);
+
+  const scenarios = useMemo(() => {
+    if (!participant) return [];
+    const db = storageGet("fmlm_admin_scenarios", scenarioDb);
+    return seededShuffle(db, participant.participant_id).slice(0, 5);
+  }, [participant]);
+
+  const currentScenario = scenarios[scenarioIndex];
+  const currentInterface = participant
+    ? interfacesForCondition(participant.condition_order)[interfaceIndex]
+    : "baseline";
+  const currentKey = currentScenario ? `${currentScenario.id}:${currentInterface}` : "";
+  const currentSelection = currentScenario
+    ? selections[currentKey] || defaultSelection(currentScenario)
+    : null;
+
+  function updateSelection(patch) {
+    setSelections((prev) => ({
+      ...prev,
+      [currentKey]: { ...currentSelection, ...patch }
+    }));
+  }
+
+  function saveScenarioRecord() {
+    const totals = computeTotals(currentScenario, currentSelection);
+    const savedRecord = {
+      scenario_id: currentScenario.id,
+      interface: interfaceLabel(currentInterface, participant.condition_order),
+      interface_type: currentInterface,
+      selected_fm: currentSelection.selected_fm,
+      selected_main: currentSelection.selected_main,
+      selected_lm: currentSelection.selected_lm,
+      total_time: totals.total_time,
+      total_cost: totals.total_cost,
+      confidence: Number(currentSelection.confidence),
+      clarity: Number(currentSelection.clarity)
+    };
+    setRecords((prev) => {
+      const withoutDuplicate = prev.filter(
+        (item) => !(item.scenario_id === savedRecord.scenario_id && item.interface_type === savedRecord.interface_type)
+      );
+      return [...withoutDuplicate, savedRecord];
+    });
+
+    if (interfaceIndex === 0) {
+      setInterfaceIndex(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (scenarioIndex < scenarios.length - 1) {
+      setScenarioIndex((idx) => idx + 1);
+      setInterfaceIndex(0);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setScreen("satisfaction");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function submitFinal() {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      participant_id: participant.participant_id,
+      condition_order: participant.condition_order,
+      background,
+      preference_ranking: ranking.map((item) => item.id),
+      scenarios: records,
+      satisfaction
+    };
+    storageSet(`fmlm_submission_${participant.participant_id}`, payload);
+    setSubmitState("submitting");
+    try {
+      if (sheetUrl) {
+        await fetch(sheetUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+      }
+      storageSet("fmlm_current_participant", null);
+      setSubmitState("done");
+      setScreen("thanks");
+    } catch (error) {
+      setSubmitState("error");
+    }
+  }
+
+  if (!ready || !participant) return <main className="loading">Loading study...</main>;
+
+  return (
+    <main>
+      <TopBar participant={participant} screen={screen} scenarioIndex={scenarioIndex} />
+      {screen === "consent" && (
+        <ConsentTutorial onStart={() => setScreen("background")} participant={participant} />
+      )}
+      {screen === "background" && (
+        <BackgroundPreference
+          background={background}
+          setBackground={setBackground}
+          ranking={ranking}
+          setRanking={setRanking}
+          onContinue={() => setScreen("scenario")}
+        />
+      )}
+      {screen === "scenario" && currentScenario && (
+        <ScenarioScreen
+          scenario={currentScenario}
+          scenarioIndex={scenarioIndex}
+          totalScenarios={scenarios.length}
+          interfaceType={currentInterface}
+          interfaceLabelText={interfaceLabel(currentInterface, participant.condition_order)}
+          selection={currentSelection}
+          updateSelection={updateSelection}
+          onContinue={saveScenarioRecord}
+        />
+      )}
+      {screen === "satisfaction" && (
+        <Satisfaction
+          satisfaction={satisfaction}
+          setSatisfaction={setSatisfaction}
+          onSubmit={submitFinal}
+          submitState={submitState}
+        />
+      )}
+      {screen === "thanks" && <Thanks participant={participant} />}
+    </main>
+  );
+}
+
+function TopBar({ participant, screen, scenarioIndex }) {
+  const step =
+    screen === "consent" ? 1 : screen === "background" ? 2 : screen === "scenario" ? 3 + scenarioIndex : screen === "satisfaction" ? 8 : 9;
+  return (
+    <header className="topbar">
+      <div>
+        <strong>Bangkok FMLM Study</strong>
+        <span>Participant {participant.participant_id}</span>
+      </div>
+      <div className="pill">Screen {step}/9</div>
+    </header>
+  );
+}
+
+function ConsentTutorial({ onStart, participant }) {
+  return (
+    <section className="page consent-page">
+      <div className="hero-study">
+        <div>
+          <p className="eyebrow">งานวิจัยการเดินทางช่วงต้นทางและปลายทาง</p>
+          <h1>ทดลองเลือกเส้นทาง FMLM ในกรุงเทพฯ</h1>
+          <p>
+            คุณจะเห็นสถานการณ์การเดินทาง 5 สถานการณ์ และทดลองใช้สองหน้าจอวางแผนเส้นทาง
+            จากนั้นให้คะแนนความมั่นใจและความชัดเจนหลังใช้งานแต่ละหน้าจอ
+          </p>
+        </div>
+      </div>
+      <div className="two-col">
+        <div className="panel">
+          <h2>Consent</h2>
+          <p>
+            การเข้าร่วมเป็นความสมัครใจ ข้อมูลที่บันทึกจะใช้เพื่อเปรียบเทียบการตัดสินใจระหว่าง
+            interface เท่านั้น ไม่มีการเก็บชื่อจริง และคุณสามารถหยุดทำแบบทดลองได้ทุกเมื่อ
+          </p>
+          <label className="checkline">
+            <input type="checkbox" required defaultChecked /> ฉันเข้าใจและยินยอมเข้าร่วมการศึกษา
+          </label>
+        </div>
+        <div className="panel">
+          <h2>Tutorial</h2>
+          <ol className="tutorial-list">
+            <li>ตอบข้อมูลพื้นฐานและจัดอันดับปัจจัยความชอบ</li>
+            <li>ในแต่ละสถานการณ์ เลือก First Mile, Main Route และ Last Mile</li>
+            <li>ให้คะแนนความมั่นใจและความชัดเจนหลังใช้งานแต่ละแอป</li>
+            <li>ระบบสลับลำดับแอปให้โดยอัตโนมัติ: {participant.condition_order}</li>
+          </ol>
+        </div>
+      </div>
+      <div className="refs-strip">
+        <img src="/refs/phone.png" alt="Prototype mobile reference" />
+        <img src="/refs/fm-main-lm.png" alt="FMLM card reference" />
+      </div>
+      <button className="primary" onClick={onStart}>เริ่มทำแบบทดลอง</button>
+    </section>
+  );
+}
+
+function BackgroundPreference({ background, setBackground, ranking, setRanking, onContinue }) {
+  const canContinue = background.freq && background.modes.length > 0 && background.appUsage;
+  return (
+    <section className="page">
+      <h1>ข้อมูลพื้นฐาน + ความชอบ</h1>
+      <div className="question-block">
+        <h2>Q1: คุณเดินทางบ่อยแค่ไหน</h2>
+        <RadioList
+          name="freq"
+          options={travelFreqOptions}
+          value={background.freq}
+          onChange={(freq) => setBackground((prev) => ({ ...prev, freq }))}
+        />
+      </div>
+      <div className="question-block">
+        <h2>Q2: รูปแบบการเดินทางที่ใช้</h2>
+        <div className="mode-grid">
+          {travelModes.map(([id, icon, label]) => {
+            const active = background.modes.includes(id);
+            return (
+              <button
+                key={id}
+                className={active ? "mode-tile active" : "mode-tile"}
+                onClick={() =>
+                  setBackground((prev) => ({
+                    ...prev,
+                    modes: active ? prev.modes.filter((mode) => mode !== id) : [...prev.modes, id]
+                  }))
+                }
+              >
+                <span>{icon}</span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="question-block">
+        <h2>Q3: คุณใช้แอปนำทางบ่อยแค่ไหน</h2>
+        <RadioList
+          name="appUsage"
+          options={appUsageOptions}
+          value={background.appUsage}
+          onChange={(appUsage) => setBackground((prev) => ({ ...prev, appUsage }))}
+        />
+      </div>
+      <div className="question-block">
+        <h2>Q4: ลากเพื่อจัดอันดับปัจจัยที่สำคัญที่สุด</h2>
+        <RankList items={ranking} setItems={setRanking} />
+      </div>
+      <button className="primary" disabled={!canContinue} onClick={onContinue}>ไปยังสถานการณ์</button>
+    </section>
+  );
+}
+
+function RadioList({ name, options, value, onChange }) {
+  return (
+    <div className="radio-list">
+      {options.map((option) => (
+        <label key={option}>
+          <input
+            type="radio"
+            name={name}
+            checked={value === option}
+            onChange={() => onChange(option)}
+          />
+          <span>{option}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function RankList({ items, setItems }) {
+  const [dragging, setDragging] = useState(null);
+  const listRef = useRef(null);
+
+  function moveItem(from, to) {
+    if (from === to || to < 0 || to >= items.length) return;
+    setItems((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDragging(to);
+  }
+
+  function indexFromPointer(clientY) {
+    const rows = Array.from(listRef.current?.querySelectorAll("[data-rank-row]") || []);
+    const found = rows.findIndex((row) => {
+      const rect = row.getBoundingClientRect();
+      return clientY < rect.top + rect.height / 2;
+    });
+    return found === -1 ? rows.length - 1 : found;
+  }
+
+  return (
+    <div className="rank-list" ref={listRef}>
+      {items.map((item, index) => (
+        <div
+          key={item.id}
+          data-rank-row
+          className={dragging === index ? "rank-row dragging" : "rank-row"}
+          draggable
+          onDragStart={() => setDragging(index)}
+          onDragOver={(event) => {
+            event.preventDefault();
+            moveItem(dragging, index);
+          }}
+          onDragEnd={() => setDragging(null)}
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+            setDragging(index);
+          }}
+          onPointerMove={(event) => {
+            if (dragging === null || event.buttons === 0) return;
+            moveItem(dragging, indexFromPointer(event.clientY));
+          }}
+          onPointerUp={() => setDragging(null)}
+        >
+          <span className="rank-no">{index + 1}</span>
+          <span className="rank-icon">{item.icon}</span>
+          <strong>{item.label}</strong>
+          <span className="drag-handle">↕</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScenarioScreen({
+  scenario,
+  scenarioIndex,
+  totalScenarios,
+  interfaceType,
+  interfaceLabelText,
+  selection,
+  updateSelection,
+  onContinue
+}) {
+  const totals = computeTotals(scenario, selection);
+  const appName = `แอป ${interfaceLabelText}`;
+  return (
+    <section className="scenario-page">
+      <div className="scenario-head">
+        <div>
+          <p className="eyebrow">สถานการณ์ {scenarioIndex + 1}/{totalScenarios}</p>
+          <h1>{scenario.origin} → {scenario.destination}</h1>
+          <p className="app-badge">{appName}</p>
+        </div>
+      </div>
+      {interfaceType === "baseline" ? (
+        <BaselineInterface scenario={scenario} selection={selection} updateSelection={updateSelection} totals={totals} />
+      ) : (
+        <PrototypeInterface scenario={scenario} selection={selection} updateSelection={updateSelection} totals={totals} />
+      )}
+      <RatingPanel selection={selection} updateSelection={updateSelection} totals={totals} onContinue={onContinue} />
+    </section>
+  );
+}
+
+function BaselineInterface({ scenario, selection, updateSelection }) {
+  return (
+    <div className="baseline-shell">
+      <div className="baseline-title">
+        <span>ต้นทาง</span>
+        <strong>{scenario.origin}</strong>
+        <span>ปลายทาง</span>
+        <strong>{scenario.destination}</strong>
+      </div>
+      <SharedRouteMap
+        mode="baseline"
+        scenario={scenario}
+        selection={selection}
+        onSelectMain={(selected_main) => {
+          const route = findMainRoute(scenario, selected_main);
+          const fm = scenario.first_mile.find((item) => route?.first_miles.includes(item.id)) || scenario.first_mile[0];
+          const lm = scenario.last_mile.find((item) => route?.last_miles.includes(item.id)) || scenario.last_mile[0];
+          updateSelection({
+            selected_main,
+            selected_fm: fm?.id || selection.selected_fm,
+            selected_lm: lm?.id || selection.selected_lm
+          });
+        }}
+      />
+      <div className="baseline-routes">
+        {scenario.main_routes.slice(0, 3).map((route, index) => {
+          const fm = scenario.first_mile.find((item) => route.first_miles.includes(item.id)) || scenario.first_mile[0];
+          const lm = scenario.last_mile.find((item) => route.last_miles.includes(item.id)) || scenario.last_mile[0];
+          const totalTime = (fm?.time_min || 0) + route.time_min + (lm?.time_min || 0);
+          const totalCost = (fm?.cost_thb || 0) + route.cost_thb + (lm?.cost_thb || 0);
+          const active = selection.selected_main === route.id;
+          return (
+            <button
+              key={route.id}
+              className={active ? "baseline-route selected" : "baseline-route"}
+              onClick={() =>
+                updateSelection({
+                  selected_main: route.id,
+                  selected_fm: fm?.id || selection.selected_fm,
+                  selected_lm: lm?.id || selection.selected_lm
+                })
+              }
+            >
+              <span className="route-letter">Route {String.fromCharCode(65 + index)}</span>
+              <span className="baseline-icons" aria-label="Route modes">
+                <i>{fm?.icon}</i>
+                <i>{route.icon}</i>
+                <i>{lm?.icon}</i>
+              </span>
+              <span className="baseline-total">
+                <strong>{totalTime} นาที</strong>
+                <small>total time</small>
+              </span>
+              <span className="baseline-total">
+                <strong>{totalCost} บาท</strong>
+                <small>total cost</small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function OptionCards({ title, items, selected, onSelect }) {
+  return (
+    <div className="option-group">
+      <h2>{title}</h2>
+      {items.map((item) => (
+        <button
+          key={item.id}
+          className={selected === item.id ? "route-card selected" : "route-card"}
+          onClick={() => onSelect(item.id)}
+        >
+          <span className="route-icon">{item.icon}</span>
+          <span>
+            <strong>{item.mode}</strong>
+            <small>{item.detail}</small>
+          </span>
+          <span className="route-metrics">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
+  const [filter, setFilter] = useState("all");
+  const main = findMainRoute(scenario, selection.selected_main);
+  const firstMileItems = scenario.first_mile.filter((item) => !main || main.first_miles.includes(item.id));
+  const lastMileItems = scenario.last_mile.filter((item) => !main || main.last_miles.includes(item.id));
+  const visibleSections = filter === "all" ? ["main", "fm", "lm"] : [filter];
+
+  function selectMainRoute(selected_main) {
+    const nextMain = findMainRoute(scenario, selected_main);
+    const nextFm =
+      scenario.first_mile.find((item) => nextMain?.first_miles.includes(item.id) && item.id === selection.selected_fm) ||
+      scenario.first_mile.find((item) => nextMain?.first_miles.includes(item.id)) ||
+      scenario.first_mile[0];
+    const nextLm =
+      scenario.last_mile.find((item) => nextMain?.last_miles.includes(item.id) && item.id === selection.selected_lm) ||
+      scenario.last_mile.find((item) => nextMain?.last_miles.includes(item.id)) ||
+      scenario.last_mile[0];
+
+    updateSelection({
+      selected_main,
+      selected_fm: nextFm?.id || selection.selected_fm,
+      selected_lm: nextLm?.id || selection.selected_lm
+    });
+  }
+
+  return (
+    <div className="prototype-shell">
+      <div className="baseline-title">
+        <span>ต้นทาง</span>
+        <strong>{scenario.origin}</strong>
+        <span>ปลายทาง</span>
+        <strong>{scenario.destination}</strong>
+      </div>
+      <div className="insight-chips">
+        <span>🏍️ วินมอไซค์ใกล้เคียง: {scenario.first_mile.filter((x) => x.mode_en.includes("motorcycle")).length} จุด</span>
+        <span>🚲 Pun Pun ใกล้ต้นทาง: {scenario.first_mile.filter((x) => x.mode_en.includes("bike")).length} จุด</span>
+        <span>⛵ เรือ: {scenario.main_routes.some((route) => route.mode.includes("เรือ")) ? "มีเส้นทางนี้" : "ไม่มี"}</span>
+        <span>🚕 แท็กซี่เริ่ม 35B</span>
+      </div>
+      <SharedRouteMap
+        mode="prototype"
+        scenario={scenario}
+        selection={selection}
+        onSelectMain={selectMainRoute}
+        onSelectFirstMile={(selected_fm) => updateSelection({ selected_fm })}
+        onSelectLastMile={(selected_lm) => updateSelection({ selected_lm })}
+      />
+      <div className="proto-summary">
+        <div><span>เร็วที่สุด</span><strong>{totals.total_time} นาที</strong><small>{main?.mode}</small></div>
+        <div><span>ถูกที่สุด</span><strong>{totals.total_cost}B</strong><small>{findOption(scenario, "first_mile", selection.selected_fm)?.mode}</small></div>
+        <div><span>แนะนำ</span><strong>{totals.total_time} นาที / {totals.total_cost}B</strong><small>สมดุลเวลาและราคา</small></div>
+        <div><span>ระยะทางเดิน</span><strong>~{totals.walk_m} ม.</strong><small>First + Last mile</small></div>
+      </div>
+      <div className="segmented">
+        {["all", "fm", "main", "lm"].map((id) => (
+          <button key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>
+            {id === "all" ? "All" : id === "fm" ? "First Mile" : id === "main" ? "Main" : "Last Mile"}
+          </button>
+        ))}
+      </div>
+      {visibleSections.includes("main") && (
+        <FmlmTable
+          title="Main Route — เส้นทางหลัก"
+          tag="MAIN"
+          color="blue"
+          items={scenario.main_routes}
+          selected={selection.selected_main}
+          onSelect={selectMainRoute}
+        />
+      )}
+      {visibleSections.includes("fm") && (
+        <FmlmTable
+          title="First Mile — ต้นทางถึงสถานี"
+          tag="FM"
+          color="purple"
+          items={firstMileItems}
+          selected={selection.selected_fm}
+          onSelect={(selected_fm) => updateSelection({ selected_fm })}
+        />
+      )}
+      {visibleSections.includes("lm") && (
+        <FmlmTable
+          title="Last Mile — สถานีถึงปลายทาง"
+          tag="LM"
+          color="green"
+          items={lastMileItems}
+          selected={selection.selected_lm}
+          onSelect={(selected_lm) => updateSelection({ selected_lm })}
+        />
+      )}
+    </div>
+  );
+}
+
+function SharedRouteMap({
+  mode,
+  scenario,
+  selection,
+  onSelectMain,
+  onSelectFirstMile,
+  onSelectLastMile
+}) {
+  const mainRoutes = mode === "baseline" ? scenario.main_routes.slice(0, 3) : scenario.main_routes;
+  const selectedMain = findMainRoute(scenario, selection.selected_main) || scenario.main_routes[0];
+  const selectedIndex = Math.max(0, scenario.main_routes.findIndex((route) => route.id === selectedMain?.id));
+  const selectedShape = routeShape(selectedIndex);
+  const compatibleFm = scenario.first_mile.filter((item) => selectedMain?.first_miles.includes(item.id));
+  const compatibleLm = scenario.last_mile.filter((item) => selectedMain?.last_miles.includes(item.id));
+
+  return (
+    <div className={`shared-map ${mode}`}>
+      <svg viewBox="0 0 900 420" role="img" aria-label={`${scenario.origin} to ${scenario.destination} route map`}>
+        <defs>
+          <pattern id={`grid-${scenario.id}-${mode}`} width="44" height="44" patternUnits="userSpaceOnUse">
+            <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#dce5e5" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="900" height="420" fill={`url(#grid-${scenario.id}-${mode})`} />
+        <path className="map-road wide" d="M10 340 C160 300 210 90 360 150 S570 325 890 120" />
+        <path className="map-road" d="M20 110 C230 175 250 355 455 290 S650 110 880 205" />
+        <path className="map-road" d="M80 395 C205 245 310 185 450 210 S655 255 840 65" />
+
+        {mode === "baseline" && mainRoutes.map((route, index) => {
+          const shape = routeShape(index);
+          const active = selection.selected_main === route.id;
+          return (
+            <g key={route.id}>
+              <path
+                className={active ? "simple-route active" : "simple-route"}
+                d={continuousPath(shape)}
+                onClick={() => onSelectMain?.(route.id)}
+              />
+              <text className="route-map-label" x={shape.label[0]} y={shape.label[1]}>
+                Route {String.fromCharCode(65 + index)}
+              </text>
+            </g>
+          );
+        })}
+
+        {mode === "prototype" && scenario.main_routes.map((route, index) => {
+          const shape = routeShape(index);
+          const active = selection.selected_main === route.id;
+          return (
+            <path
+              key={route.id}
+              className={active ? "main-map-route active" : "main-map-route"}
+              d={mainPath(shape)}
+              onClick={() => onSelectMain?.(route.id)}
+            />
+          );
+        })}
+
+        {mode === "prototype" && compatibleFm.map((item, index) => {
+          const active = selection.selected_fm === item.id;
+          return (
+            <path
+              key={item.id}
+              className={active ? "fm-map-route active" : "fm-map-route"}
+              d={milePath("fm", selectedShape, index)}
+              onClick={() => onSelectFirstMile?.(item.id)}
+            />
+          );
+        })}
+
+        {mode === "prototype" && compatibleLm.map((item, index) => {
+          const active = selection.selected_lm === item.id;
+          return (
+            <path
+              key={item.id}
+              className={active ? "lm-map-route active" : "lm-map-route"}
+              d={milePath("lm", selectedShape, index)}
+              onClick={() => onSelectLastMile?.(item.id)}
+            />
+          );
+        })}
+
+        <circle className="map-marker origin" cx="96" cy="344" r="16" />
+        <text className="map-marker-text" x="96" y="350">A</text>
+        <circle className="map-marker destination" cx="800" cy="76" r="16" />
+        <text className="map-marker-text" x="800" y="82">B</text>
+        <text className="map-place origin-label" x="126" y="350">{scenario.origin.split(" ")[0]}</text>
+        <text className="map-place destination-label" x="616" y="82">{scenario.destination.split(" ")[0]}</text>
+      </svg>
+      <div className="map-legend">
+        {mode === "baseline" ? (
+          <>
+            <span><i className="simple" />Route A/B/C</span>
+            <span><i className="selected" />Selected</span>
+          </>
+        ) : (
+          <>
+            <span><i className="fm" />First Mile</span>
+            <span><i className="main" />Main</span>
+            <span><i className="lm" />Last Mile</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function routeShape(index) {
+  const offsets = [-46, 0, 48, 86, -88];
+  const offset = offsets[index % offsets.length];
+  return {
+    origin: [96, 344],
+    fmEnd: [245, 278 + offset * 0.35],
+    mid1: [370, 180 + offset],
+    mid2: [555, 210 - offset * 0.65],
+    lmStart: [685, 122 + offset * 0.28],
+    dest: [800, 76],
+    label: [355 + index * 54, 246 + offset * 0.45]
+  };
+}
+
+function continuousPath(shape) {
+  return `M${shape.origin[0]} ${shape.origin[1]} C${shape.fmEnd[0]} ${shape.fmEnd[1]}, ${shape.mid1[0]} ${shape.mid1[1]}, ${shape.mid2[0]} ${shape.mid2[1]} S${shape.lmStart[0]} ${shape.lmStart[1]}, ${shape.dest[0]} ${shape.dest[1]}`;
+}
+
+function mainPath(shape) {
+  return `M${shape.fmEnd[0]} ${shape.fmEnd[1]} C${shape.mid1[0]} ${shape.mid1[1]}, ${shape.mid2[0]} ${shape.mid2[1]}, ${shape.lmStart[0]} ${shape.lmStart[1]}`;
+}
+
+function milePath(type, shape, index) {
+  const spread = (index - 1) * 18;
+  if (type === "fm") {
+    return `M${shape.origin[0]} ${shape.origin[1]} C${150 + spread} ${330 - spread}, ${205 + spread} ${300 + spread}, ${shape.fmEnd[0]} ${shape.fmEnd[1]}`;
+  }
+  return `M${shape.lmStart[0]} ${shape.lmStart[1]} C${720 + spread} ${112 + spread}, ${760 - spread} ${86 - spread}, ${shape.dest[0]} ${shape.dest[1]}`;
+}
+
+function FmlmTable({ title, tag, color, items, selected, onSelect }) {
+  const bestTime = Math.min(...items.map((item) => item.time_min));
+  return (
+    <section className={`fmlm-table ${color}`}>
+      <header>
+        <h2>{title} <span>{tag}</span></h2>
+        <div><button>เวลา</button><button>ราคา</button></div>
+      </header>
+      {items.map((item) => (
+        <button key={item.id} className={selected === item.id ? "fmlm-row selected" : "fmlm-row"} onClick={() => onSelect(item.id)}>
+          <span className="route-icon">{item.icon}</span>
+          <span className="row-detail">
+            <strong>{item.mode} {item.time_min === bestTime && <em>ดีที่สุด</em>}</strong>
+            <small>{item.detail}</small>
+          </span>
+          <span className="row-frequency">{item.reliability === "สูง" ? "ทุก 3–5 นาที" : item.reliability === "กลาง" ? "ทุก 10 นาที" : "ไม่แน่นอน"}</span>
+          <span className="row-price">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
+        </button>
+      ))}
+      <footer>
+        {items.map((item) => <span key={item.id}><i />{item.time_min}นาที/{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>)}
+      </footer>
+    </section>
+  );
+}
+
+function RatingPanel({ selection, updateSelection, totals, onContinue }) {
+  const canContinue = selection.confidence && selection.clarity;
+  return (
+    <aside className="rating-panel">
+      <div>
+        <span>ตัวเลือกปัจจุบัน</span>
+        <strong>{totals.total_time} นาที · {totals.total_cost} บาท · เดิน ~{totals.walk_m} ม.</strong>
+      </div>
+      <RatingChoice
+        label="ความมั่นใจในการตัดสินใจ"
+        value={selection.confidence}
+        onChange={(confidence) => updateSelection({ confidence })}
+      />
+      <RatingChoice
+        label="ความชัดเจน/เข้าใจง่าย"
+        value={selection.clarity}
+        onChange={(clarity) => updateSelection({ clarity })}
+      />
+      <button className="primary" disabled={!canContinue} onClick={onContinue}>บันทึกและไปต่อ</button>
+    </aside>
+  );
+}
+
+function RatingChoice({ label, value, onChange }) {
+  return (
+    <fieldset className="rating-choice">
+      <legend>{label}</legend>
+      <div>
+        {[1, 2, 3, 4, 5].map((score) => (
+          <label key={score} className={String(value) === String(score) ? "selected" : ""}>
+            <input
+              type="radio"
+              name={label}
+              value={score}
+              checked={String(value) === String(score)}
+              onChange={() => onChange(score)}
+            />
+            <span>{score}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function Satisfaction({ satisfaction, setSatisfaction, onSubmit, submitState }) {
+  const questions = [
+    ["better_decide", "แอปใดช่วยให้คุณตัดสินใจเลือกเส้นทางได้ดีกว่า"],
+    ["matches_pref", "แอปใดช่วยให้คุณเลือกเส้นทางที่ตรงกับความชอบมากกว่า"],
+    ["would_use", "แอปใดที่คุณอยากใช้จริงในชีวิตประจำวัน"]
+  ];
+  const ready = questions.every(([id]) => satisfaction[id]);
+  return (
+    <section className="page">
+      <h1>Final satisfaction</h1>
+      {questions.map(([id, label]) => (
+        <div className="question-block" key={id}>
+          <h2>{label}</h2>
+          <RadioList
+            name={id}
+            options={satisfactionOptions}
+            value={satisfaction[id]}
+            onChange={(value) => setSatisfaction((prev) => ({ ...prev, [id]: value }))}
+          />
+        </div>
+      ))}
+      <label className="comment-box">
+        ความคิดเห็นเพิ่มเติม
+        <textarea value={satisfaction.comment} onChange={(event) => setSatisfaction((prev) => ({ ...prev, comment: event.target.value }))} />
+      </label>
+      {submitState === "error" && <p className="error">ส่งข้อมูลไม่สำเร็จ กรุณาตรวจสอบ Sheet URL แล้วลองอีกครั้ง</p>}
+      <button className="primary" disabled={!ready || submitState === "submitting"} onClick={onSubmit}>
+        {submitState === "submitting" ? "กำลังส่ง..." : "ส่งคำตอบสุดท้าย"}
+      </button>
+    </section>
+  );
+}
+
+function Thanks() {
+  return (
+    <section className="page thanks">
+      <h1>ขอบคุณมากค่ะ/ครับ</h1>
+      <p>คุณทำแบบทดลองเสร็จเรียบร้อยแล้ว ขอบคุณสำหรับเวลาและความคิดเห็นของคุณ</p>
+    </section>
+  );
+}
