@@ -2,6 +2,13 @@ function doPost(e) {
   const payload = JSON.parse(e.postData.contents);
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
+  if (payload.log_type === "event") {
+    appendEvent_(spreadsheet, payload);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, type: "event" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   appendBackground_(spreadsheet, payload);
   appendScenarios_(spreadsheet, payload);
   appendSatisfaction_(spreadsheet, payload);
@@ -9,6 +16,32 @@ function doPost(e) {
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function appendEvent_(spreadsheet, payload) {
+  const sheet = sheetWithHeaders_(spreadsheet, "Events", [
+    "timestamp",
+    "participant_id",
+    "condition_order",
+    "event_type",
+    "screen",
+    "scenario_id",
+    "interface",
+    "interface_type",
+    "payload_json"
+  ]);
+
+  sheet.appendRow([
+    payload.timestamp,
+    payload.participant_id,
+    payload.condition_order,
+    payload.event_type,
+    payload.screen,
+    payload.scenario_id,
+    payload.interface,
+    payload.interface_type,
+    JSON.stringify(payload.payload || {})
+  ]);
 }
 
 function appendBackground_(spreadsheet, payload) {

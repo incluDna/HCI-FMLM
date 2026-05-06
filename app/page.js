@@ -40,6 +40,7 @@ const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL || process.env.VITE_SHEET_URL
 
 const initialBackground = { freq: "", modes: [], appUsage: "" };
 const initialSatisfaction = { better_decide: "", matches_pref: "", would_use: "", comment: "" };
+const eventQueueKey = "fmlm_event_queue";
 
 function defaultSelection(scenario) {
   return {
@@ -49,6 +50,47 @@ function defaultSelection(scenario) {
     confidence: "",
     clarity: ""
   };
+}
+
+async function queueLogEvent(participant, event) {
+  const eventPayload = {
+    timestamp: new Date().toISOString(),
+    participant_id: participant.participant_id,
+    condition_order: participant.condition_order,
+    event_type: event.event_type,
+    screen: event.screen || "",
+    scenario_id: event.scenario_id || "",
+    interface: event.interface || "",
+    interface_type: event.interface_type || "",
+    payload: event.payload || {}
+  };
+
+  const queued = storageGet(eventQueueKey, []);
+  const nextQueue = [...queued, eventPayload];
+  storageSet(eventQueueKey, nextQueue);
+
+  if (!sheetUrl) return;
+  await flushEventQueue();
+}
+
+async function flushEventQueue() {
+  const queued = storageGet(eventQueueKey, []);
+  if (!queued.length || !sheetUrl) return;
+
+  const remaining = [];
+  for (const eventPayload of queued) {
+    try {
+      await fetch(sheetUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ log_type: "event", ...eventPayload })
+      });
+    } catch {
+      remaining.push(eventPayload);
+    }
+  }
+  storageSet(eventQueueKey, remaining);
 }
 
 export default function StudyApp() {
@@ -65,6 +107,7 @@ export default function StudyApp() {
   const [submitState, setSubmitState] = useState("idle");
 
   useEffect(() => {
+    flushEventQueue();
     const saved = storageGet("fmlm_current_participant", null);
     if (saved?.participant_id) {
       setParticipant(saved);
@@ -79,6 +122,11 @@ export default function StudyApp() {
       storageSet("fmlm_participant_counter", nextCounter + 1);
       storageSet("fmlm_current_participant", created);
       setParticipant(created);
+      queueLogEvent(created, {
+        event_type: "session_started",
+        screen: "consent",
+        payload: { participant_counter: nextCounter }
+      });
     }
 
     const adminScenarios = storageGet("fmlm_admin_scenarios", null);
@@ -101,6 +149,11 @@ export default function StudyApp() {
     ? selections[currentKey] || defaultSelection(currentScenario)
     : null;
 
+  async function logEvent(event) {
+    if (!participant) return;
+    await queueLogEvent(participant, event);
+  }
+
   function updateSelection(patch) {
     setSelections((prev) => ({
       ...prev,
@@ -122,6 +175,14 @@ export default function StudyApp() {
       confidence: Number(currentSelection.confidence),
       clarity: Number(currentSelection.clarity)
     };
+    logEvent({
+      event_type: "rating_submitted",
+      screen: `scenario_${scenarioIndex + 1}`,
+      scenario_id: currentScenario.id,
+      interface: savedRecord.interface,
+      interface_type: currentInterface,
+      payload: savedRecord
+    });
     setRecords((prev) => {
       const withoutDuplicate = prev.filter(
         (item) => !(item.scenario_id === savedRecord.scenario_id && item.interface_type === savedRecord.interface_type)
@@ -131,12 +192,30 @@ export default function StudyApp() {
 
     if (interfaceIndex === 0) {
       setInterfaceIndex(1);
+      logEvent({
+        event_type: "scenario_interface_started",
+        screen: `scenario_${scenarioIndex + 1}`,
+        scenario_id: currentScenario.id,
+        interface: interfaceLabel(interfacesForCondition(participant.condition_order)[1], participant.condition_order),
+        interface_type: interfacesForCondition(participant.condition_order)[1],
+        payload: {}
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     if (scenarioIndex < scenarios.length - 1) {
+      const nextScenario = scenarios[scenarioIndex + 1];
+      const nextInterface = interfacesForCondition(participant.condition_order)[0];
       setScenarioIndex((idx) => idx + 1);
       setInterfaceIndex(0);
+      logEvent({
+        event_type: "scenario_interface_started",
+        screen: `scenario_${scenarioIndex + 2}`,
+        scenario_id: nextScenario.id,
+        interface: interfaceLabel(nextInterface, participant.condition_order),
+        interface_type: nextInterface,
+        payload: {}
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -162,9 +241,17 @@ export default function StudyApp() {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ log_type: "summary", ...payload })
         });
       }
+      await logEvent({
+        event_type: "study_completed",
+        screen: "thanks",
+        payload: {
+          scenario_records: records.length,
+          satisfaction
+        }
+      });
       storageSet("fmlm_current_participant", null);
       setSubmitState("done");
       setScreen("thanks");
@@ -179,7 +266,13 @@ export default function StudyApp() {
     <main>
       <TopBar participant={participant} screen={screen} scenarioIndex={scenarioIndex} />
       {screen === "consent" && (
-        <ConsentTutorial onStart={() => setScreen("background")} participant={participant} />
+        <ConsentTutorial
+          onStart={() => {
+            logEvent({ event_type: "consent_completed", screen: "consent", payload: {} });
+            setScreen("background");
+          }}
+          participant={participant}
+        />
       )}
       {screen === "background" && (
         <BackgroundPreference
@@ -187,7 +280,28 @@ export default function StudyApp() {
           setBackground={setBackground}
           ranking={ranking}
           setRanking={setRanking}
-          onContinue={() => setScreen("scenario")}
+          onContinue={() => {
+            logEvent({
+              event_type: "background_completed",
+              screen: "background",
+              payload: {
+                background,
+                preference_ranking: ranking.map((item) => item.id)
+              }
+            });
+            if (scenarios[0]) {
+              const firstInterface = interfacesForCondition(participant.condition_order)[0];
+              logEvent({
+                event_type: "scenario_interface_started",
+                screen: "scenario_1",
+                scenario_id: scenarios[0].id,
+                interface: interfaceLabel(firstInterface, participant.condition_order),
+                interface_type: firstInterface,
+                payload: {}
+              });
+            }
+            setScreen("scenario");
+          }}
         />
       )}
       {screen === "scenario" && currentScenario && (
