@@ -137,7 +137,21 @@ export default function StudyApp() {
   const scenarios = useMemo(() => {
     if (!participant) return [];
     const db = storageGet("fmlm_admin_scenarios", scenarioDb);
-    return seededShuffle(db, participant.participant_id).slice(0, 5);
+     // แบ่ง 10 routes เป็น 3 กลุ่ม หมุนตาม counter
+  // counter 0 → routes 0,1,2 | counter 1 → routes 3,4,5 | ...
+    const PICK = 3;
+    const counter = participant.participant_counter;
+    const groupIndex = counter % Math.ceil(db.length / PICK);
+    const start = groupIndex * PICK;
+  
+    // เอา routes ในกลุ่มนี้ แล้วสุ่มลำดับ
+    const group = db.slice(start, start + PICK);
+    // ถ้ากลุ่มสุดท้ายไม่ครบ 3 ให้เติมจากต้น
+    if (group.length < PICK) {
+      group.push(...db.slice(0, PICK - group.length));
+    }
+    
+    return seededShuffle(group, participant.participant_id);
   }, [participant]);
 
   const currentScenario = scenarios[scenarioIndex];
@@ -163,9 +177,11 @@ export default function StudyApp() {
 
   function saveScenarioRecord() {
     const totals = computeTotals(currentScenario, currentSelection);
+    // ✅ แก้: interfaceLabel รับแค่ interfaceType ไม่ต้องส่ง condition_order
+    const label = interfaceLabel(currentInterface);
     const savedRecord = {
       scenario_id: currentScenario.id,
-      interface: interfaceLabel(currentInterface, participant.condition_order),
+      interface: label,
       interface_type: currentInterface,
       selected_fm: currentSelection.selected_fm,
       selected_main: currentSelection.selected_main,
@@ -179,7 +195,7 @@ export default function StudyApp() {
       event_type: "rating_submitted",
       screen: `scenario_${scenarioIndex + 1}`,
       scenario_id: currentScenario.id,
-      interface: savedRecord.interface,
+      interface: label,
       interface_type: currentInterface,
       payload: savedRecord
     });
@@ -192,12 +208,14 @@ export default function StudyApp() {
 
     if (interfaceIndex === 0) {
       setInterfaceIndex(1);
+      const nextInterface = interfacesForCondition(participant.condition_order)[1];
       logEvent({
         event_type: "scenario_interface_started",
         screen: `scenario_${scenarioIndex + 1}`,
         scenario_id: currentScenario.id,
-        interface: interfaceLabel(interfacesForCondition(participant.condition_order)[1], participant.condition_order),
-        interface_type: interfacesForCondition(participant.condition_order)[1],
+        // ✅ แก้
+        interface: interfaceLabel(nextInterface),
+        interface_type: nextInterface,
         payload: {}
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -212,7 +230,8 @@ export default function StudyApp() {
         event_type: "scenario_interface_started",
         screen: `scenario_${scenarioIndex + 2}`,
         scenario_id: nextScenario.id,
-        interface: interfaceLabel(nextInterface, participant.condition_order),
+        // ✅ แก้
+        interface: interfaceLabel(nextInterface),
         interface_type: nextInterface,
         payload: {}
       });
@@ -295,7 +314,8 @@ export default function StudyApp() {
                 event_type: "scenario_interface_started",
                 screen: "scenario_1",
                 scenario_id: scenarios[0].id,
-                interface: interfaceLabel(firstInterface, participant.condition_order),
+                // ✅ แก้
+                interface: interfaceLabel(firstInterface),
                 interface_type: firstInterface,
                 payload: {}
               });
@@ -310,7 +330,8 @@ export default function StudyApp() {
           scenarioIndex={scenarioIndex}
           totalScenarios={scenarios.length}
           interfaceType={currentInterface}
-          interfaceLabelText={interfaceLabel(currentInterface, participant.condition_order)}
+          // ✅ แก้
+          interfaceLabelText={interfaceLabel(currentInterface)}
           selection={currentSelection}
           updateSelection={updateSelection}
           onContinue={saveScenarioRecord}
@@ -529,13 +550,14 @@ function ScenarioScreen({
 }) {
   const totals = computeTotals(scenario, selection);
   const appName = `แอป ${interfaceLabelText}`;
+  const badgeClass = `app-badge app-${interfaceLabelText.toLowerCase()}`;
   return (
     <section className="scenario-page">
       <div className="scenario-head">
         <div>
+          <p className={badgeClass}>{appName}</p>
           <p className="eyebrow">สถานการณ์ {scenarioIndex + 1}/{totalScenarios}</p>
           <h1>{scenario.origin} → {scenario.destination}</h1>
-          <p className="app-badge">{appName}</p>
         </div>
       </div>
       {interfaceType === "baseline" ? (
@@ -958,10 +980,12 @@ function Satisfaction({ satisfaction, setSatisfaction, onSubmit, submitState }) 
           />
         </div>
       ))}
+      <div className="question-block">
       <label className="comment-box">
-        ความคิดเห็นเพิ่มเติม
+        ความคิดเห็นเพิ่มเติม<span className="red-star">*</span>
         <textarea value={satisfaction.comment} onChange={(event) => setSatisfaction((prev) => ({ ...prev, comment: event.target.value }))} />
       </label>
+      </div>
       {submitState === "error" && <p className="error">ส่งข้อมูลไม่สำเร็จ กรุณาตรวจสอบ Sheet URL แล้วลองอีกครั้ง</p>}
       <button className="primary" disabled={!ready || submitState === "submitting"} onClick={onSubmit}>
         {submitState === "submitting" ? "กำลังส่ง..." : "ส่งคำตอบสุดท้าย"}
