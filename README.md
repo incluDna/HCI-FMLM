@@ -1,7 +1,7 @@
 ##  Progress
 
 | state | action |
-|:--------:|:--------:|
+|:--------|:--------|
 | option แต่ละ routes | Not yet |
 | ไม่ sort เวลาและราคาจริงๆ | Not yet |
 | เอาคำว่า แอปA/B ไว้บรรทัดบน | Done |
