@@ -1111,6 +1111,70 @@ main {
   background: #fff;
 }
 
+.relation-picker {
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+}
+
+.relation-picker legend {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.84rem;
+  margin-bottom: 6px;
+}
+
+.relation-picker div {
+  display: grid;
+  gap: 8px;
+}
+
+.relation-picker label {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 6px 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.relation-picker label.selected {
+  border-color: var(--blue);
+  background: #eef6ff;
+}
+
+.relation-picker input {
+  width: 18px;
+  height: 18px;
+}
+
+.relation-picker small {
+  grid-column: 2;
+  color: var(--muted);
+}
+
+.relation-picker p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-map svg {
+  height: 320px;
+}
+
+.admin-map .admin-main {
+  opacity: 0.62;
+  stroke-width: 9;
+}
+
+.admin-map .admin-mile {
+  opacity: 0.58;
+  stroke-width: 6;
+}
+
 .collection-head {
   display: flex;
   justify-content: space-between;
