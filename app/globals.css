@@ -1433,7 +1433,7 @@ main {
   font-size: 0.84rem;
 }
 
-.admin-field input, .json-box {
+.admin-field input {
   width: 100%;
   min-height: 42px;
   padding: 10px;
@@ -1553,13 +1553,6 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
-}
-
-.json-box {
-  min-height: 360px;
-  margin: 8px 0 12px;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 0.86rem;
 }
 
 @media (max-width: 860px) {

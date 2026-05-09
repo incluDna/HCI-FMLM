@@ -48,7 +48,6 @@ const blankMile = {
 export default function AdminPage() {
   const [scenarios, setScenarios] = useState([]);
   const [selectedId, setSelectedId] = useState("");
-  const [jsonText, setJsonText] = useState("");
   const [saveState, setSaveState] = useState("");
   const selected = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedId) || scenarios[0],
@@ -61,19 +60,16 @@ export default function AdminPage() {
         const next = saved.length ? saved : scenarioDb;
         setScenarios(next);
         setSelectedId(next[0]?.id || "");
-        setJsonText(JSON.stringify(next, null, 2));
       })
       .catch((error) => {
         setSaveState(`Load failed: ${error.message}`);
         setScenarios(scenarioDb);
         setSelectedId(scenarioDb[0]?.id || "");
-        setJsonText(JSON.stringify(scenarioDb, null, 2));
       });
   }, []);
 
   function persist(next) {
     setScenarios(next);
-    setJsonText(JSON.stringify(next, null, 2));
     setSaveState("Saving...");
     saveScenarioDb(next)
       .then((result) => setSaveState(`Saved to ${result.source}`))
@@ -101,17 +97,6 @@ export default function AdminPage() {
     const next = scenarios.filter((scenario) => scenario.id !== selected.id);
     persist(next);
     setSelectedId(next[0]?.id || "");
-  }
-
-  function applyJson() {
-    try {
-      const parsed = JSON.parse(jsonText);
-      if (!Array.isArray(parsed)) throw new Error("Scenario DB must be an array");
-      persist(parsed);
-      setSelectedId(parsed[0]?.id || "");
-    } catch (error) {
-      alert(error.message);
-    }
   }
 
   if (!selected) {
@@ -201,13 +186,6 @@ export default function AdminPage() {
             onChange={(index, patch) => updateListField("last_mile", index, patch)}
             onDelete={(index) => updateSelected({ last_mile: selected.last_mile.filter((_, itemIndex) => itemIndex !== index) })}
           />
-
-          <div className="admin-card">
-            <h2>Import / export JSON</h2>
-            <p>ใช้ช่องนี้สำหรับใส่ GPX-converted data หรือ route geometry เพิ่มเองในอนาคตได้ เช่นเพิ่ม field `route_points` ต่อ route โดย study UI จะยังไม่พัง</p>
-            <textarea className="json-box" value={jsonText} onChange={(event) => setJsonText(event.target.value)} />
-            <button className="primary" onClick={applyJson}>Apply JSON to local DB</button>
-          </div>
         </section>
       </section>
     </main>
