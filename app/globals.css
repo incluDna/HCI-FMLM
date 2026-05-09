@@ -129,6 +129,59 @@ main {
   line-height: 1.7;
 }
 
+.consent-card {
+  padding: clamp(20px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.consent-card h1 {
+  max-width: 920px;
+  margin: 0 0 18px;
+  font-size: clamp(1.9rem, 5vw, 4rem);
+  line-height: 1.08;
+}
+
+.consent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.consent-grid section {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.consent-grid h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.consent-grid p {
+  margin: 0;
+  color: #3f473f;
+  line-height: 1.65;
+}
+
+.consent-check {
+  align-items: flex-start;
+  max-width: 880px;
+  margin: 18px 0;
+}
+
+.consent-check input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+}
+
 .two-col, .baseline-leg-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1255,6 +1308,10 @@ main {
 
 @media (max-width: 860px) {
   .two-col, .baseline-leg-grid, .refs-strip, .proto-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .consent-grid {
     grid-template-columns: 1fr;
   }
 

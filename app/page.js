@@ -359,45 +359,50 @@ function TopBar({ participant, screen, scenarioIndex }) {
   );
 }
 
-function ConsentTutorial({ onStart, participant }) {
+function ConsentTutorial({ onStart }) {
+  const [consented, setConsented] = useState(false);
+
   return (
     <section className="page consent-page">
-      <div className="hero-study">
-        <div>
-          <p className="eyebrow">งานวิจัยการเดินทางช่วงต้นทางและปลายทาง</p>
-          <h1>ทดลองเลือกเส้นทาง FMLM ในกรุงเทพฯ</h1>
-          <p>
-            คุณจะเห็นสถานการณ์การเดินทาง 5 สถานการณ์ และทดลองใช้สองหน้าจอวางแผนเส้นทาง
-            จากนั้นให้คะแนนความมั่นใจและความชัดเจนหลังใช้งานแต่ละหน้าจอ
-          </p>
+      <div className="consent-card">
+        <p className="eyebrow">แบบฟอร์มยินยอมเข้าร่วมการศึกษา</p>
+        <h1>การเข้าถึงระบบขนส่งช่วงต้นทางและปลายทางในกรุงเทพฯ</h1>
+        <div className="consent-grid">
+          <section>
+            <h2>วัตถุประสงค์</h2>
+            <p>การศึกษานี้ต้องการเปรียบเทียบวิธีนำเสนอข้อมูลเส้นทาง เพื่อทำความเข้าใจว่าข้อมูล First Mile / Last Mile ช่วยให้ผู้ใช้ตัดสินใจเลือกเส้นทางได้ดีขึ้นหรือไม่</p>
+          </section>
+          <section>
+            <h2>สิ่งที่ผู้เข้าร่วมจะทำ</h2>
+            <p>คุณจะตอบคำถามพื้นฐาน จัดอันดับปัจจัยความชอบ ทดลองเลือกเส้นทางใน 5 สถานการณ์ผ่านแอป 2 รูปแบบ และให้คะแนนหลังการใช้งานแต่ละรูปแบบ</p>
+          </section>
+          <section>
+            <h2>ระยะเวลา</h2>
+            <p>ใช้เวลาประมาณ 10-15 นาที</p>
+          </section>
+          <section>
+            <h2>ความสมัครใจ</h2>
+            <p>การเข้าร่วมเป็นไปโดยสมัครใจ คุณสามารถหยุดทำแบบทดลองได้ทุกเมื่อ โดยไม่มีผลเสียใด ๆ</p>
+          </section>
+          <section>
+            <h2>ข้อมูลและความเป็นส่วนตัว</h2>
+            <p>ระบบจะบันทึกคำตอบ เช่น เส้นทางที่เลือก คะแนนประเมิน และข้อมูลการโต้ตอบกับหน้าเว็บ เพื่อใช้วิเคราะห์ในเชิงวิชาการเท่านั้น โดยไม่เก็บชื่อจริง</p>
+          </section>
+          <section>
+            <h2>ความเสี่ยง</h2>
+            <p>การศึกษานี้มีความเสี่ยงต่ำ เนื่องจากเป็นเพียงการใช้งานหน้าจอจำลองและตอบแบบสอบถาม</p>
+          </section>
         </div>
+        <label className="checkline consent-check">
+          <input
+            type="checkbox"
+            checked={consented}
+            onChange={(event) => setConsented(event.target.checked)}
+          />
+          <span>ฉันได้อ่านข้อมูลข้างต้น เข้าใจ และยินยอมเข้าร่วมการศึกษา</span>
+        </label>
+        <button className="primary" disabled={!consented} onClick={onStart}>ยินยอมและเริ่มทำแบบทดลอง</button>
       </div>
-      <div className="two-col">
-        <div className="panel">
-          <h2>Consent</h2>
-          <p>
-            การเข้าร่วมเป็นความสมัครใจ ข้อมูลที่บันทึกจะใช้เพื่อเปรียบเทียบการตัดสินใจระหว่าง
-            interface เท่านั้น ไม่มีการเก็บชื่อจริง และคุณสามารถหยุดทำแบบทดลองได้ทุกเมื่อ
-          </p>
-          <label className="checkline">
-            <input type="checkbox" required defaultChecked /> ฉันเข้าใจและยินยอมเข้าร่วมการศึกษา
-          </label>
-        </div>
-        <div className="panel">
-          <h2>Tutorial</h2>
-          <ol className="tutorial-list">
-            <li>ตอบข้อมูลพื้นฐานและจัดอันดับปัจจัยความชอบ</li>
-            <li>ในแต่ละสถานการณ์ เลือก First Mile, Main Route และ Last Mile</li>
-            <li>ให้คะแนนความมั่นใจและความชัดเจนหลังใช้งานแต่ละแอป</li>
-            <li>ระบบสลับลำดับแอปให้โดยอัตโนมัติ: {participant.condition_order}</li>
-          </ol>
-        </div>
-      </div>
-      <div className="refs-strip">
-        <img src="/refs/phone.png" alt="Prototype mobile reference" />
-        <img src="/refs/fm-main-lm.png" alt="FMLM card reference" />
-      </div>
-      <button className="primary" onClick={onStart}>เริ่มทำแบบทดลอง</button>
     </section>
   );
 }
