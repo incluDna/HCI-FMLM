@@ -807,7 +807,7 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
         <strong>{scenario.destination}</strong>
       </div>
       <div className="insight-chips">
-        <span>🏍️ วินมอไซค์ใกล้เคียง: {scenario.first_mile.filter((x) => x.mode_en.includes("motorcycle")).length} จุด</span>
+        <span>🏍️ วินมอเตอร์ไซค์ใกล้เคียง: {scenario.first_mile.filter((x) => x.mode_en.includes("motorcycle")).length} จุด</span>
         <span>🚲 Pun Pun ใกล้ต้นทาง: {scenario.first_mile.filter((x) => x.mode_en.includes("bike")).length} จุด</span>
         <span>⛵ เรือ: {scenario.main_routes.some((route) => route.mode.includes("เรือ")) ? "มีเส้นทางนี้" : "ไม่มี"}</span>
         <span>🚕 แท็กซี่เริ่ม 35B</span>
