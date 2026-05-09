@@ -123,6 +123,45 @@ const initialSatisfaction = {
 };
 const eventQueueKey = "fmlm_event_queue";
 
+function decodeFinalSatisfaction(satisfaction, conditionOrder) {
+  const [appAInterface, appBInterface] = interfacesForCondition(conditionOrder);
+  const decoded = {
+    app_a_interface_type: appAInterface,
+    app_b_interface_type: appBInterface,
+    by_interface: {}
+  };
+
+  finalComparativeQuestions.forEach((question) => {
+    const value = Number(satisfaction[question.field]);
+    decoded.by_interface[question.field] = decodeComparativeValue(value, appAInterface, appBInterface);
+    decoded[`${question.field}_preferred_interface_type`] = decoded.by_interface[question.field].preferred_interface_type;
+    decoded[`${question.field}_baseline_vs_prototype`] = decoded.by_interface[question.field].baseline_vs_prototype;
+  });
+
+  return decoded;
+}
+
+function decodeComparativeValue(value, appAInterface, appBInterface) {
+  const strengthByValue = {
+    1: "much",
+    2: "slight",
+    3: "equal",
+    4: "slight",
+    5: "much"
+  };
+  const preferredInterface =
+    value < 3 ? appAInterface :
+    value > 3 ? appBInterface :
+    "equal";
+
+  return {
+    raw_app_scale: value,
+    preferred_interface_type: preferredInterface,
+    strength: strengthByValue[value] || "",
+    baseline_vs_prototype: appAInterface === "baseline" ? value : 6 - value
+  };
+}
+
 function defaultSelection(scenario) {
   return {
     selected_fm: scenario.first_mile[0]?.id || "",
@@ -322,6 +361,11 @@ export default function StudyApp() {
   }
 
   async function submitFinal() {
+    const decodedSatisfaction = decodeFinalSatisfaction(satisfaction, participant.condition_order);
+    const satisfactionWithInterfaceTypes = {
+      ...satisfaction,
+      ...decodedSatisfaction
+    };
     const payload = {
       timestamp: new Date().toISOString(),
       participant_id: participant.participant_id,
@@ -329,7 +373,7 @@ export default function StudyApp() {
       background,
       preference_ranking: ranking.map((item) => item.id),
       scenarios: records,
-      satisfaction
+      satisfaction: satisfactionWithInterfaceTypes
     };
     storageSet(`fmlm_submission_${participant.participant_id}`, payload);
     setSubmitState("submitting");
@@ -349,7 +393,7 @@ export default function StudyApp() {
         screen: "thanks",
         payload: {
           scenario_records: records.length,
-          satisfaction
+          satisfaction: satisfactionWithInterfaceTypes
         }
       });
       storageSet("fmlm_current_participant", null);
