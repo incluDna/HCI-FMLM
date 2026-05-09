@@ -859,14 +859,41 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
 }
 
 function FmlmTable({ title, tag, color, items, selected, onSelect }) {
-  const bestTime = Math.min(...items.map((item) => item.time_min));
+  const [sortKey, setSortKey] = useState("time_min");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const bestTime = items.length ? Math.min(...items.map((item) => item.time_min)) : null;
+  const sortedItems = [...items].sort((a, b) => {
+    const left = Number(a[sortKey] || 0);
+    const right = Number(b[sortKey] || 0);
+    const primary = sortDirection === "asc" ? left - right : right - left;
+    if (primary !== 0) return primary;
+    return Number(a.time_min || 0) - Number(b.time_min || 0) || Number(a.cost_thb || 0) - Number(b.cost_thb || 0);
+  });
+
+  function toggleSort(nextKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(nextKey);
+      setSortDirection("asc");
+    }
+  }
+
   return (
     <section className={`fmlm-table ${color}`}>
       <header>
         <h2>{title} <span>{tag}</span></h2>
-        <div><button>เวลา</button><button>ราคา</button></div>
+        <div className="sort-control" aria-label="เรียงตาม">
+          <span>เรียงตาม</span>
+          <button className={sortKey === "time_min" ? "active" : ""} onClick={() => toggleSort("time_min")}>
+            เวลา {sortKey === "time_min" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+          </button>
+          <button className={sortKey === "cost_thb" ? "active" : ""} onClick={() => toggleSort("cost_thb")}>
+            ราคา {sortKey === "cost_thb" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+          </button>
+        </div>
       </header>
-      {items.map((item) => (
+      {sortedItems.map((item) => (
         <button key={item.id} className={selected === item.id ? "fmlm-row selected" : "fmlm-row"} onClick={() => onSelect(item.id)}>
           <span className="route-icon">{item.icon}</span>
           <span className="row-detail">
@@ -877,9 +904,6 @@ function FmlmTable({ title, tag, color, items, selected, onSelect }) {
           <span className="row-price">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
         </button>
       ))}
-      <footer>
-        {items.map((item) => <span key={item.id}><i />{item.time_min}นาที/{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>)}
-      </footer>
     </section>
   );
 }
