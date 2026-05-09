@@ -179,6 +179,13 @@ main {
   line-height: 1.65;
 }
 
+.consent-grid ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: #3f473f;
+  line-height: 1.65;
+}
+
 .consent-check {
   align-items: flex-start;
   max-width: 880px;
