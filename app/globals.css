@@ -1275,6 +1275,27 @@ main {
   line-height: 1.7;
 }
 
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-actions form {
+  margin: 0;
+}
+
+.admin-actions button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .admin-status {
   display: inline-flex;
   width: fit-content;
@@ -1307,6 +1328,60 @@ main {
   top: 78px;
   display: grid;
   gap: 10px;
+}
+
+.admin-login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.admin-login-card {
+  width: min(460px, 100%);
+  padding: clamp(22px, 5vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.admin-login-card h1 {
+  margin: 0 0 10px;
+  font-size: clamp(2rem, 8vw, 3.6rem);
+  line-height: 1;
+}
+
+.admin-login-card p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.admin-login-card form {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 14px;
+}
+
+.admin-login-card label {
+  display: grid;
+  gap: 7px;
+  font-weight: 800;
+}
+
+.admin-login-card input {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #fff;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger) !important;
+  font-weight: 800;
 }
 
 .admin-scenario {

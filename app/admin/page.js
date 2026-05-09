@@ -132,7 +132,12 @@ export default function AdminPage() {
           <p>Scenario data is saved to Supabase when configured. Without Supabase env vars, this page falls back to localStorage.</p>
           <p className="admin-status">{hasSupabaseConfig ? "Supabase connected" : "Supabase not configured"}{saveState ? ` - ${saveState}` : ""}</p>
         </div>
-        <a className="secondary-link" href="/">Back to study</a>
+        <div className="admin-actions">
+          <a className="secondary-link" href="/">Back to study</a>
+          <form action="/api/admin-logout" method="post">
+            <button type="submit">Log out</button>
+          </form>
+        </div>
       </header>
 
       <section className="admin-layout">
