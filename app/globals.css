@@ -95,6 +95,16 @@ main {
   line-height: 1.05;
 }
 
+.page-intro {
+  margin-bottom: 18px;
+}
+
+.page-intro h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 1.05;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--blue);
@@ -200,6 +210,10 @@ main {
   padding: 22px;
 }
 
+.background-page .question-block {
+  margin-bottom: 14px;
+}
+
 .panel h2, .question-block h2, .option-group h2 {
   margin: 0 0 14px;
   font-size: 1.1rem;
@@ -247,6 +261,58 @@ main {
 .radio-list {
   display: grid;
   gap: 10px;
+}
+
+.scale-choice {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scale-choice label {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 112px;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+
+.scale-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scale-choice strong {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #eef0ea;
+  font-size: 1.05rem;
+}
+
+.scale-choice span {
+  color: #3f473f;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.scale-choice label.selected {
+  border-color: #16384d;
+  background: #eaf3ff;
+  box-shadow: inset 0 0 0 2px rgba(22, 56, 77, 0.18);
+}
+
+.scale-choice label.selected strong {
+  color: #fff;
+  background: #16384d;
 }
 
 .radio-list label {
@@ -1317,6 +1383,21 @@ main {
 
   .mode-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scale-choice {
+    grid-template-columns: 1fr;
+  }
+
+  .scale-choice label {
+    grid-template-columns: 42px 1fr;
+    min-height: 56px;
+    align-items: center;
+    text-align: left;
+  }
+
+  .scale-choice strong {
+    margin: 0;
   }
 
   .scenario-head, .gm-route-summary {

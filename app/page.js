@@ -38,6 +38,13 @@ const travelModes = [
   ["other", "➕", "อื่น ๆ"]
 ];
 const appUsageOptions = ["บ่อยมาก", "บางครั้ง", "นาน ๆ ครั้ง", "ไม่เคยใช้"];
+const multiLegFamiliarityOptions = [
+  { value: 1, label: "ไม่คุ้นเคยเลย" },
+  { value: 2, label: "ไม่ค่อยคุ้นเคย" },
+  { value: 3, label: "ปานกลาง" },
+  { value: 4, label: "ค่อนข้างคุ้นเคย" },
+  { value: 5, label: "คุ้นเคยมาก" }
+];
 const satisfactionOptions = [
   "แอป A ดีกว่ามาก",
   "แอป A ดีกว่าเล็กน้อย",
@@ -47,7 +54,7 @@ const satisfactionOptions = [
 ];
 const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL || process.env.VITE_SHEET_URL || "";
 
-const initialBackground = { freq: "", modes: [], appUsage: "" };
+const initialBackground = { freq: "", modes: [], appUsage: "", multiLegFamiliarity: "" };
 const initialSatisfaction = { better_decide: "", matches_pref: "", would_use: "", comment: "" };
 const eventQueueKey = "fmlm_event_queue";
 
@@ -408,10 +415,13 @@ function ConsentTutorial({ onStart }) {
 }
 
 function BackgroundPreference({ background, setBackground, ranking, setRanking, onContinue }) {
-  const canContinue = background.freq && background.modes.length > 0 && background.appUsage;
+  const canContinue = background.freq && background.modes.length > 0 && background.appUsage && background.multiLegFamiliarity;
   return (
-    <section className="page">
-      <h1>ข้อมูลพื้นฐาน + ความชอบ</h1>
+    <section className="page background-page">
+      <div className="page-intro">
+        <p className="eyebrow">ข้อมูลก่อนเริ่มสถานการณ์</p>
+        <h1>ข้อมูลพื้นฐาน + ความชอบ</h1>
+      </div>
       <div className="question-block">
         <h2>Q1: คุณเดินทางบ่อยแค่ไหน</h2>
         <RadioList
@@ -457,8 +467,37 @@ function BackgroundPreference({ background, setBackground, ranking, setRanking, 
         <h2>Q4: ลากเพื่อจัดอันดับปัจจัยที่สำคัญที่สุด</h2>
         <RankList items={ranking} setItems={setRanking} />
       </div>
+      <div className="question-block">
+        <h2>Q5: คุณคุ้นเคยกับการเดินทางที่ต้องต่อหลายช่วงก่อนถึงสายหลัก เช่น เดิน → วิน → สองแถว → รถไฟฟ้า → เดินหรือต่อรถ อีกครั้ง มากแค่ไหน</h2>
+        <ScaleChoice
+          name="multiLegFamiliarity"
+          options={multiLegFamiliarityOptions}
+          value={background.multiLegFamiliarity}
+          onChange={(multiLegFamiliarity) => setBackground((prev) => ({ ...prev, multiLegFamiliarity }))}
+        />
+      </div>
       <button className="primary" disabled={!canContinue} onClick={onContinue}>ไปยังสถานการณ์</button>
     </section>
+  );
+}
+
+function ScaleChoice({ name, options, value, onChange }) {
+  return (
+    <div className="scale-choice">
+      {options.map((option) => (
+        <label key={option.value} className={Number(value) === option.value ? "selected" : ""}>
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={Number(value) === option.value}
+            onChange={() => onChange(option.value)}
+          />
+          <strong>{option.value}</strong>
+          <span>{option.label}</span>
+        </label>
+      ))}
+    </div>
   );
 }
 

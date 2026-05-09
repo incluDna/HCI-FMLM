@@ -52,6 +52,7 @@ function appendBackground_(spreadsheet, payload) {
     "freq",
     "modes",
     "appUsage",
+    "multiLegFamiliarity",
     "preference_ranking"
   ]);
 
@@ -62,6 +63,7 @@ function appendBackground_(spreadsheet, payload) {
     payload.background.freq,
     (payload.background.modes || []).join(","),
     payload.background.appUsage,
+    payload.background.multiLegFamiliarity,
     (payload.preference_ranking || []).join(",")
   ]);
 }
