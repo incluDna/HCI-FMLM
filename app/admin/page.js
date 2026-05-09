@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { scenarioDb } from "@/lib/scenarios";
-import { storageGet, storageSet } from "@/lib/experiment";
+import { hasSupabaseConfig, loadScenarioDb, saveScenarioDb } from "@/lib/supabaseStore";
 
 const blankScenario = {
   id: "",
@@ -10,7 +10,6 @@ const blankScenario = {
   destination: "",
   origin_coords: { lat: 13.7563, lng: 100.5018 },
   destination_coords: { lat: 13.7563, lng: 100.5018 },
-  map_embed: "",
   main_routes: [],
   first_mile: [],
   last_mile: []
@@ -25,7 +24,8 @@ const blankMainRoute = {
   detail: "",
   reliability: "กลาง",
   first_miles: [],
-  last_miles: []
+  last_miles: [],
+  gpx: ""
 };
 
 const blankMile = {
@@ -38,29 +38,43 @@ const blankMile = {
   walk_m: 0,
   reliability: "กลาง",
   transfers: 0,
-  detail: ""
+  detail: "",
+  gpx: ""
 };
 
 export default function AdminPage() {
   const [scenarios, setScenarios] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [jsonText, setJsonText] = useState("");
+  const [saveState, setSaveState] = useState("");
   const selected = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedId) || scenarios[0],
     [scenarios, selectedId]
   );
 
   useEffect(() => {
-    const saved = storageGet("fmlm_admin_scenarios", scenarioDb);
-    setScenarios(saved);
-    setSelectedId(saved[0]?.id || "");
-    setJsonText(JSON.stringify(saved, null, 2));
+    loadScenarioDb()
+      .then((saved) => {
+        const next = saved.length ? saved : scenarioDb;
+        setScenarios(next);
+        setSelectedId(next[0]?.id || "");
+        setJsonText(JSON.stringify(next, null, 2));
+      })
+      .catch((error) => {
+        setSaveState(`Load failed: ${error.message}`);
+        setScenarios(scenarioDb);
+        setSelectedId(scenarioDb[0]?.id || "");
+        setJsonText(JSON.stringify(scenarioDb, null, 2));
+      });
   }, []);
 
   function persist(next) {
     setScenarios(next);
-    storageSet("fmlm_admin_scenarios", next);
     setJsonText(JSON.stringify(next, null, 2));
+    setSaveState("Saving...");
+    saveScenarioDb(next)
+      .then((result) => setSaveState(`Saved to ${result.source}`))
+      .catch((error) => setSaveState(`Save failed: ${error.message}`));
   }
 
   function updateSelected(patch) {
@@ -112,7 +126,8 @@ export default function AdminPage() {
         <div>
           <p className="eyebrow">Bangkok FMLM</p>
           <h1>Scenario admin</h1>
-          <p>เพิ่มสถานการณ์ เส้นทางหลัก และตัวเลือก First/Last Mile ได้จากหน้านี้ ข้อมูลเก็บใน localStorage ของ browser นี้</p>
+          <p>Scenario data is saved to Supabase when configured. Without Supabase env vars, this page falls back to localStorage.</p>
+          <p className="admin-status">{hasSupabaseConfig ? "Supabase connected" : "Supabase not configured"}{saveState ? ` - ${saveState}` : ""}</p>
         </div>
         <a className="secondary-link" href="/">Back to study</a>
       </header>
@@ -141,13 +156,12 @@ export default function AdminPage() {
             <Field label="Destination Thai" value={selected.destination} onChange={(destination) => updateSelected({ destination })} />
             <Field label="Origin lat,lng" value={`${selected.origin_coords?.lat || ""},${selected.origin_coords?.lng || ""}`} onChange={(value) => updateCoords("origin_coords", value, updateSelected)} />
             <Field label="Destination lat,lng" value={`${selected.destination_coords?.lat || ""},${selected.destination_coords?.lng || ""}`} onChange={(value) => updateCoords("destination_coords", value, updateSelected)} />
-            <Field label="Google Maps iframe embed URL" value={selected.map_embed} onChange={(map_embed) => updateSelected({ map_embed })} />
           </div>
 
           <RouteCollection
             title="Main routes"
             items={selected.main_routes}
-            fields={["id", "mode", "icon", "time_min", "cost_thb", "detail", "reliability", "first_miles", "last_miles"]}
+            fields={["id", "mode", "icon", "time_min", "cost_thb", "detail", "reliability", "first_miles", "last_miles", "gpx"]}
             onAdd={() => updateSelected({ main_routes: [...selected.main_routes, { ...blankMainRoute, id: `main-${Date.now()}` }] })}
             onChange={(index, patch) => updateListField("main_routes", index, patch)}
             onDelete={(index) => updateSelected({ main_routes: selected.main_routes.filter((_, itemIndex) => itemIndex !== index) })}
@@ -156,7 +170,7 @@ export default function AdminPage() {
           <RouteCollection
             title="First mile options"
             items={selected.first_mile}
-            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail"]}
+            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail", "gpx"]}
             onAdd={() => updateSelected({ first_mile: [...selected.first_mile, { ...blankMile, id: `fm-${Date.now()}` }] })}
             onChange={(index, patch) => updateListField("first_mile", index, patch)}
             onDelete={(index) => updateSelected({ first_mile: selected.first_mile.filter((_, itemIndex) => itemIndex !== index) })}
@@ -165,7 +179,7 @@ export default function AdminPage() {
           <RouteCollection
             title="Last mile options"
             items={selected.last_mile}
-            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail"]}
+            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail", "gpx"]}
             onAdd={() => updateSelected({ last_mile: [...selected.last_mile, { ...blankMile, id: `lm-${Date.now()}` }] })}
             onChange={(index, patch) => updateListField("last_mile", index, patch)}
             onDelete={(index) => updateSelected({ last_mile: selected.last_mile.filter((_, itemIndex) => itemIndex !== index) })}
@@ -189,10 +203,29 @@ function updateCoords(field, value, updateSelected) {
 }
 
 function Field({ label, value, onChange }) {
+  const [draft, setDraft] = useState(value ?? "");
+
+  useEffect(() => {
+    setDraft(value ?? "");
+  }, [value]);
+
+  function commit() {
+    if (draft !== (value ?? "")) onChange(draft);
+  }
+
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input value={value ?? ""} onChange={(event) => onChange(event.target.value)} />
+      <input
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+      />
     </label>
   );
 }
@@ -205,7 +238,7 @@ function RouteCollection({ title, items, fields, onAdd, onChange, onDelete }) {
         <button onClick={onAdd}>Add</button>
       </div>
       {items.map((item, index) => (
-        <details key={`${item.id}-${index}`} className="route-editor" open={index === 0}>
+        <details key={`${title}-${index}`} className="route-editor" open={index === 0}>
           <summary>{item.icon} {item.mode || item.id}</summary>
           <div className="route-fields">
             {fields.map((field) => (

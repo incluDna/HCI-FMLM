@@ -14,6 +14,12 @@ import {
   storageGet,
   storageSet
 } from "@/lib/experiment";
+import {
+  hasSupabaseConfig,
+  insertStudyEvent,
+  insertStudySubmission,
+  loadScenarioDb
+} from "@/lib/supabaseStore";
 
 const travelFreqOptions = ["ทุกวัน", "3–5 วันต่อสัปดาห์", "1–2 วันต่อสัปดาห์", "นาน ๆ ครั้ง"];
 const travelModes = [
@@ -69,23 +75,27 @@ async function queueLogEvent(participant, event) {
   const nextQueue = [...queued, eventPayload];
   storageSet(eventQueueKey, nextQueue);
 
-  if (!sheetUrl) return;
+  if (!hasSupabaseConfig && !sheetUrl) return;
   await flushEventQueue();
 }
 
 async function flushEventQueue() {
   const queued = storageGet(eventQueueKey, []);
-  if (!queued.length || !sheetUrl) return;
+  if (!queued.length || (!hasSupabaseConfig && !sheetUrl)) return;
 
   const remaining = [];
   for (const eventPayload of queued) {
     try {
-      await fetch(sheetUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ log_type: "event", ...eventPayload })
-      });
+      if (hasSupabaseConfig) {
+        await insertStudyEvent(eventPayload);
+      } else {
+        await fetch(sheetUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ log_type: "event", ...eventPayload })
+        });
+      }
     } catch {
       remaining.push(eventPayload);
     }
@@ -105,6 +115,7 @@ export default function StudyApp() {
   const [records, setRecords] = useState([]);
   const [satisfaction, setSatisfaction] = useState(initialSatisfaction);
   const [submitState, setSubmitState] = useState("idle");
+  const [scenarioPool, setScenarioPool] = useState(scenarioDb);
 
   useEffect(() => {
     flushEventQueue();
@@ -129,16 +140,16 @@ export default function StudyApp() {
       });
     }
 
-    const adminScenarios = storageGet("fmlm_admin_scenarios", null);
-    if (!adminScenarios) storageSet("fmlm_admin_scenarios", scenarioDb);
-    setReady(true);
+    loadScenarioDb()
+      .then((db) => setScenarioPool(db.length ? db : scenarioDb))
+      .catch(() => setScenarioPool(storageGet("fmlm_admin_scenarios", scenarioDb)))
+      .finally(() => setReady(true));
   }, []);
 
   const scenarios = useMemo(() => {
     if (!participant) return [];
-    const db = storageGet("fmlm_admin_scenarios", scenarioDb);
-    return seededShuffle(db, participant.participant_id).slice(0, 5);
-  }, [participant]);
+    return seededShuffle(scenarioPool, participant.participant_id).slice(0, 5);
+  }, [participant, scenarioPool]);
 
   const currentScenario = scenarios[scenarioIndex];
   const currentInterface = participant
@@ -236,7 +247,9 @@ export default function StudyApp() {
     storageSet(`fmlm_submission_${participant.participant_id}`, payload);
     setSubmitState("submitting");
     try {
-      if (sheetUrl) {
+      if (hasSupabaseConfig) {
+        await insertStudySubmission(payload);
+      } else if (sheetUrl) {
         await fetch(sheetUrl, {
           method: "POST",
           mode: "no-cors",
@@ -973,8 +986,8 @@ function Satisfaction({ satisfaction, setSatisfaction, onSubmit, submitState }) 
 function Thanks() {
   return (
     <section className="page thanks">
-      <h1>ขอบคุณมากค่ะ/ครับ</h1>
-      <p>คุณทำแบบทดลองเสร็จเรียบร้อยแล้ว ขอบคุณสำหรับเวลาและความคิดเห็นของคุณ</p>
+      <h1>แบบทดสอบเสร็จสิ้นแล้ว</h1>
+      <p>ผู้วิจัยขอขอบพระคุณในความร่วมมือของท่านที่กรุณาให้ข้อมูล เพื่อนำไปใช้ประโยชน์ในเชิงวิชาการต่อไป</p>
     </section>
   );
 }
