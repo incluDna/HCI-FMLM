@@ -16,6 +16,35 @@ function FitBounds({ bounds }) {
   return null;
 }
 
+function CtrlWheelZoom() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let lastZoomAt = 0;
+
+    function handleWheel(event) {
+      if (!event.ctrlKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const now = Date.now();
+      if (now - lastZoomAt < 80) return;
+      lastZoomAt = now;
+
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const nextZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + direction));
+      map.setZoomAround(map.mouseEventToContainerPoint(event), nextZoom);
+    }
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [map]);
+
+  return null;
+}
+
 export default function RouteMap({
   scenario,
   mode = "baseline",
@@ -110,6 +139,7 @@ export default function RouteMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds bounds={bounds} />
+        <CtrlWheelZoom />
         {origin && (
           <Marker position={[origin.lat, origin.lng]}>
             <Popup>Origin: {scenario.origin}</Popup>
@@ -136,6 +166,7 @@ export default function RouteMap({
           </Polyline>
         ))}
       </MapContainer>
+      <div className="map-zoom-hint">Ctrl + scroll เพื่อซูมแผนที่</div>
       <div className="map-legend osm-legend">
         {mode === "baseline" ? (
           <>
