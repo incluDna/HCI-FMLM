@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { scenarioDb, preferenceFactors } from "@/lib/scenarios";
 import {
   computeTotals,
@@ -20,6 +21,8 @@ import {
   insertStudySubmission,
   loadScenarioDb
 } from "@/lib/supabaseStore";
+
+const RouteMap = dynamic(() => import("@/app/components/RouteMap"), { ssr: false });
 
 const travelFreqOptions = ["ทุกวัน", "3–5 วันต่อสัปดาห์", "1–2 วันต่อสัปดาห์", "นาน ๆ ครั้ง"];
 const travelModes = [
@@ -570,7 +573,7 @@ function BaselineInterface({ scenario, selection, updateSelection }) {
         <span>ปลายทาง</span>
         <strong>{scenario.destination}</strong>
       </div>
-      <SharedRouteMap
+      <RouteMap
         mode="baseline"
         scenario={scenario}
         selection={selection}
@@ -687,7 +690,7 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
         <span>⛵ เรือ: {scenario.main_routes.some((route) => route.mode.includes("เรือ")) ? "มีเส้นทางนี้" : "ไม่มี"}</span>
         <span>🚕 แท็กซี่เริ่ม 35B</span>
       </div>
-      <SharedRouteMap
+      <RouteMap
         mode="prototype"
         scenario={scenario}
         selection={selection}
@@ -740,143 +743,6 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
       )}
     </div>
   );
-}
-
-function SharedRouteMap({
-  mode,
-  scenario,
-  selection,
-  onSelectMain,
-  onSelectFirstMile,
-  onSelectLastMile
-}) {
-  const mainRoutes = mode === "baseline" ? scenario.main_routes.slice(0, 3) : scenario.main_routes;
-  const selectedMain = findMainRoute(scenario, selection.selected_main) || scenario.main_routes[0];
-  const selectedIndex = Math.max(0, scenario.main_routes.findIndex((route) => route.id === selectedMain?.id));
-  const selectedShape = routeShape(selectedIndex);
-  const compatibleFm = scenario.first_mile.filter((item) => selectedMain?.first_miles.includes(item.id));
-  const compatibleLm = scenario.last_mile.filter((item) => selectedMain?.last_miles.includes(item.id));
-
-  return (
-    <div className={`shared-map ${mode}`}>
-      <svg viewBox="0 0 900 420" role="img" aria-label={`${scenario.origin} to ${scenario.destination} route map`}>
-        <defs>
-          <pattern id={`grid-${scenario.id}-${mode}`} width="44" height="44" patternUnits="userSpaceOnUse">
-            <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#dce5e5" strokeWidth="1" />
-          </pattern>
-        </defs>
-        <rect width="900" height="420" fill={`url(#grid-${scenario.id}-${mode})`} />
-        <path className="map-road wide" d="M10 340 C160 300 210 90 360 150 S570 325 890 120" />
-        <path className="map-road" d="M20 110 C230 175 250 355 455 290 S650 110 880 205" />
-        <path className="map-road" d="M80 395 C205 245 310 185 450 210 S655 255 840 65" />
-
-        {mode === "baseline" && mainRoutes.map((route, index) => {
-          const shape = routeShape(index);
-          const active = selection.selected_main === route.id;
-          return (
-            <g key={route.id}>
-              <path
-                className={active ? "simple-route active" : "simple-route"}
-                d={continuousPath(shape)}
-                onClick={() => onSelectMain?.(route.id)}
-              />
-              <text className="route-map-label" x={shape.label[0]} y={shape.label[1]}>
-                Route {String.fromCharCode(65 + index)}
-              </text>
-            </g>
-          );
-        })}
-
-        {mode === "prototype" && scenario.main_routes.map((route, index) => {
-          const shape = routeShape(index);
-          const active = selection.selected_main === route.id;
-          return (
-            <path
-              key={route.id}
-              className={active ? "main-map-route active" : "main-map-route"}
-              d={mainPath(shape)}
-              onClick={() => onSelectMain?.(route.id)}
-            />
-          );
-        })}
-
-        {mode === "prototype" && compatibleFm.map((item, index) => {
-          const active = selection.selected_fm === item.id;
-          return (
-            <path
-              key={item.id}
-              className={active ? "fm-map-route active" : "fm-map-route"}
-              d={milePath("fm", selectedShape, index)}
-              onClick={() => onSelectFirstMile?.(item.id)}
-            />
-          );
-        })}
-
-        {mode === "prototype" && compatibleLm.map((item, index) => {
-          const active = selection.selected_lm === item.id;
-          return (
-            <path
-              key={item.id}
-              className={active ? "lm-map-route active" : "lm-map-route"}
-              d={milePath("lm", selectedShape, index)}
-              onClick={() => onSelectLastMile?.(item.id)}
-            />
-          );
-        })}
-
-        <circle className="map-marker origin" cx="96" cy="344" r="16" />
-        <text className="map-marker-text" x="96" y="350">A</text>
-        <circle className="map-marker destination" cx="800" cy="76" r="16" />
-        <text className="map-marker-text" x="800" y="82">B</text>
-        <text className="map-place origin-label" x="126" y="350">{scenario.origin.split(" ")[0]}</text>
-        <text className="map-place destination-label" x="616" y="82">{scenario.destination.split(" ")[0]}</text>
-      </svg>
-      <div className="map-legend">
-        {mode === "baseline" ? (
-          <>
-            <span><i className="simple" />Route A/B/C</span>
-            <span><i className="selected" />Selected</span>
-          </>
-        ) : (
-          <>
-            <span><i className="fm" />First Mile</span>
-            <span><i className="main" />Main</span>
-            <span><i className="lm" />Last Mile</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function routeShape(index) {
-  const offsets = [-46, 0, 48, 86, -88];
-  const offset = offsets[index % offsets.length];
-  return {
-    origin: [96, 344],
-    fmEnd: [245, 278 + offset * 0.35],
-    mid1: [370, 180 + offset],
-    mid2: [555, 210 - offset * 0.65],
-    lmStart: [685, 122 + offset * 0.28],
-    dest: [800, 76],
-    label: [355 + index * 54, 246 + offset * 0.45]
-  };
-}
-
-function continuousPath(shape) {
-  return `M${shape.origin[0]} ${shape.origin[1]} C${shape.fmEnd[0]} ${shape.fmEnd[1]}, ${shape.mid1[0]} ${shape.mid1[1]}, ${shape.mid2[0]} ${shape.mid2[1]} S${shape.lmStart[0]} ${shape.lmStart[1]}, ${shape.dest[0]} ${shape.dest[1]}`;
-}
-
-function mainPath(shape) {
-  return `M${shape.fmEnd[0]} ${shape.fmEnd[1]} C${shape.mid1[0]} ${shape.mid1[1]}, ${shape.mid2[0]} ${shape.mid2[1]}, ${shape.lmStart[0]} ${shape.lmStart[1]}`;
-}
-
-function milePath(type, shape, index) {
-  const spread = (index - 1) * 18;
-  if (type === "fm") {
-    return `M${shape.origin[0]} ${shape.origin[1]} C${150 + spread} ${330 - spread}, ${205 + spread} ${300 + spread}, ${shape.fmEnd[0]} ${shape.fmEnd[1]}`;
-  }
-  return `M${shape.lmStart[0]} ${shape.lmStart[1]} C${720 + spread} ${112 + spread}, ${760 - spread} ${86 - spread}, ${shape.dest[0]} ${shape.dest[1]}`;
 }
 
 function FmlmTable({ title, tag, color, items, selected, onSelect }) {

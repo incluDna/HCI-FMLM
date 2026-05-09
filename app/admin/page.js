@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { scenarioDb } from "@/lib/scenarios";
 import { hasSupabaseConfig, loadScenarioDb, saveScenarioDb } from "@/lib/supabaseStore";
+
+const RouteMap = dynamic(() => import("@/app/components/RouteMap"), { ssr: false });
 
 const blankScenario = {
   id: "",
@@ -160,7 +163,7 @@ export default function AdminPage() {
 
           <div className="admin-card">
             <h2>Route map preview</h2>
-            <AdminRouteMap scenario={selected} />
+            <RouteMap scenario={selected} mode="admin" selection={{}} height={320} />
           </div>
 
           <RouteCollection
@@ -295,15 +298,23 @@ function RouteCollection({ title, items, fields, relationOptions = {}, onAdd, on
                   onChange={(value) => onChange(index, { [field]: value })}
                 />
               ) : (
-                <Field
-                  key={field}
-                  label={field}
-                  value={Array.isArray(item[field]) ? item[field].join(",") : item[field]}
-                  onChange={(value) => {
-                    const numeric = ["time_min", "cost_thb", "walk_m", "transfers"].includes(field);
-                    onChange(index, { [field]: numeric ? Number(value) : value });
-                  }}
-                />
+                field === "gpx" ? (
+                  <GpxUpload
+                    key={field}
+                    route={item}
+                    onChange={(patch) => onChange(index, patch)}
+                  />
+                ) : (
+                  <Field
+                    key={field}
+                    label={field}
+                    value={Array.isArray(item[field]) ? item[field].join(",") : item[field]}
+                    onChange={(value) => {
+                      const numeric = ["time_min", "cost_thb", "walk_m", "transfers"].includes(field);
+                      onChange(index, { [field]: numeric ? Number(value) : value });
+                    }}
+                  />
+                )
               )
             ))}
           </div>
@@ -314,80 +325,24 @@ function RouteCollection({ title, items, fields, relationOptions = {}, onAdd, on
   );
 }
 
-function AdminRouteMap({ scenario }) {
-  const mainRoutes = scenario.main_routes || [];
-  const firstMiles = scenario.first_mile || [];
-  const lastMiles = scenario.last_mile || [];
+function GpxUpload({ route, onChange }) {
+  async function handleFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    onChange({
+      gpx: file.name,
+      gpx_filename: file.name,
+      gpx_text: text
+    });
+  }
 
   return (
-    <div className="shared-map admin-map">
-      <svg viewBox="0 0 900 420" role="img" aria-label="Admin route overlay preview">
-        <defs>
-          <pattern id={`admin-grid-${scenario.id}`} width="44" height="44" patternUnits="userSpaceOnUse">
-            <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#dce5e5" strokeWidth="1" />
-          </pattern>
-        </defs>
-        <rect width="900" height="420" fill={`url(#admin-grid-${scenario.id})`} />
-        <path className="map-road wide" d="M10 340 C160 300 210 90 360 150 S570 325 890 120" />
-        <path className="map-road" d="M20 110 C230 175 250 355 455 290 S650 110 880 205" />
-        <path className="map-road" d="M80 395 C205 245 310 185 450 210 S655 255 840 65" />
-
-        {mainRoutes.map((route, index) => {
-          const shape = adminRouteShape(index);
-          return (
-            <g key={route.id || index}>
-              <path className="main-map-route active admin-main" d={adminMainPath(shape)} />
-              {(route.first_miles || []).map((id, fmIndex) => (
-                <path key={`${route.id}-fm-${id}`} className="fm-map-route active admin-mile" d={adminMilePath("fm", shape, fmIndex)} />
-              ))}
-              {(route.last_miles || []).map((id, lmIndex) => (
-                <path key={`${route.id}-lm-${id}`} className="lm-map-route active admin-mile" d={adminMilePath("lm", shape, lmIndex)} />
-              ))}
-              <text className="route-map-label" x={shape.label[0]} y={shape.label[1]}>
-                {route.mode || route.id || `Route ${index + 1}`}
-              </text>
-            </g>
-          );
-        })}
-
-        <circle className="map-marker origin" cx="96" cy="344" r="16" />
-        <text className="map-marker-text" x="96" y="350">A</text>
-        <circle className="map-marker destination" cx="800" cy="76" r="16" />
-        <text className="map-marker-text" x="800" y="82">B</text>
-        <text className="map-place origin-label" x="126" y="350">{scenario.origin}</text>
-        <text className="map-place destination-label" x="616" y="82">{scenario.destination}</text>
-      </svg>
-      <div className="map-legend">
-        <span><i className="fm" />First mile links ({firstMiles.length})</span>
-        <span><i className="main" />Main routes ({mainRoutes.length})</span>
-        <span><i className="lm" />Last mile links ({lastMiles.length})</span>
-      </div>
-    </div>
+    <label className="admin-field gpx-upload">
+      <span>GPX file</span>
+      <input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" onChange={handleFile} />
+      {route.gpx_filename || route.gpx ? <small>{route.gpx_filename || route.gpx}</small> : <small>No GPX uploaded</small>}
+    </label>
   );
-}
-
-function adminRouteShape(index) {
-  const offsets = [-46, 0, 48, 86, -88];
-  const offset = offsets[index % offsets.length];
-  return {
-    origin: [96, 344],
-    fmEnd: [245, 278 + offset * 0.35],
-    mid1: [370, 180 + offset],
-    mid2: [555, 210 - offset * 0.65],
-    lmStart: [685, 122 + offset * 0.28],
-    dest: [800, 76],
-    label: [330 + index * 36, 244 + offset * 0.42]
-  };
-}
-
-function adminMainPath(shape) {
-  return `M${shape.fmEnd[0]} ${shape.fmEnd[1]} C${shape.mid1[0]} ${shape.mid1[1]}, ${shape.mid2[0]} ${shape.mid2[1]}, ${shape.lmStart[0]} ${shape.lmStart[1]}`;
-}
-
-function adminMilePath(type, shape, index) {
-  const spread = (index - 1) * 18;
-  if (type === "fm") {
-    return `M${shape.origin[0]} ${shape.origin[1]} C${150 + spread} ${330 - spread}, ${205 + spread} ${300 + spread}, ${shape.fmEnd[0]} ${shape.fmEnd[1]}`;
-  }
-  return `M${shape.lmStart[0]} ${shape.lmStart[1]} C${720 + spread} ${112 + spread}, ${760 - spread} ${86 - spread}, ${shape.dest[0]} ${shape.dest[1]}`;
 }
