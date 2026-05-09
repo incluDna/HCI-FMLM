@@ -1043,8 +1043,7 @@ main {
 }
 
 .rating-panel {
-  position: sticky;
-  bottom: 0;
+  position: static;
   z-index: 10;
   display: grid;
   grid-template-columns: 1fr;
