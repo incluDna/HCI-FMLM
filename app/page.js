@@ -45,6 +45,35 @@ const multiLegFamiliarityOptions = [
   { value: 4, label: "ค่อนข้างคุ้นเคย" },
   { value: 5, label: "คุ้นเคยมาก" }
 ];
+const postInterfaceQuestions = [
+  {
+    field: "clarity",
+    text: "ฉันเข้าใจข้อมูลการเดินทางบนหน้าจอนี้ได้ง่าย",
+    construct: "Clarity / understandability"
+  },
+  {
+    field: "decision_ease",
+    text: "หน้าจอนี้ช่วยให้ฉันเปรียบเทียบตัวเลือกและตัดสินใจเลือกเส้นทางได้ง่าย",
+    construct: "Ease of decision-making"
+  },
+  {
+    field: "fmlm_understanding",
+    text: "ฉันบอกได้ชัดเจนว่าอะไรคือช่วงต้นทาง ช่วงหลัก และช่วงปลายทางของเส้นทางที่เลือก",
+    construct: "First-mile / main-transit / last-mile understanding"
+  },
+  {
+    field: "preference_fit",
+    text: "เส้นทางที่ฉันเลือกตรงกับสิ่งที่ฉันต้องการสำหรับสถานการณ์นี้",
+    construct: "Subjective preference fit"
+  }
+];
+const agreementScaleOptions = [
+  { value: 1, label: "ไม่เห็นด้วยอย่างยิ่ง" },
+  { value: 2, label: "ไม่เห็นด้วย" },
+  { value: 3, label: "ปานกลาง" },
+  { value: 4, label: "เห็นด้วย" },
+  { value: 5, label: "เห็นด้วยอย่างยิ่ง" }
+];
 const satisfactionOptions = [
   "แอป A ดีกว่ามาก",
   "แอป A ดีกว่าเล็กน้อย",
@@ -63,8 +92,10 @@ function defaultSelection(scenario) {
     selected_fm: scenario.first_mile[0]?.id || "",
     selected_main: scenario.main_routes[0]?.id || "",
     selected_lm: scenario.last_mile[0]?.id || "",
-    confidence: "",
-    clarity: ""
+    clarity: "",
+    decision_ease: "",
+    fmlm_understanding: "",
+    preference_fit: ""
   };
 }
 
@@ -193,8 +224,10 @@ export default function StudyApp() {
       selected_lm: currentSelection.selected_lm,
       total_time: totals.total_time,
       total_cost: totals.total_cost,
-      confidence: Number(currentSelection.confidence),
-      clarity: Number(currentSelection.clarity)
+      clarity: Number(currentSelection.clarity),
+      decision_ease: Number(currentSelection.decision_ease),
+      fmlm_understanding: Number(currentSelection.fmlm_understanding),
+      preference_fit: Number(currentSelection.preference_fit)
     };
     logEvent({
       event_type: "rating_submitted",
@@ -816,43 +849,46 @@ function FmlmTable({ title, tag, color, items, selected, onSelect }) {
 }
 
 function RatingPanel({ selection, updateSelection, totals, onContinue }) {
-  const canContinue = selection.confidence && selection.clarity;
+  const canContinue = postInterfaceQuestions.every((question) => selection[question.field]);
   return (
     <aside className="rating-panel">
       <div>
         <span>ตัวเลือกปัจจุบัน</span>
         <strong>{totals.total_time} นาที · {totals.total_cost} บาท · เดิน ~{totals.walk_m} ม.</strong>
       </div>
-      <RatingChoice
-        label="ความมั่นใจในการตัดสินใจ"
-        value={selection.confidence}
-        onChange={(confidence) => updateSelection({ confidence })}
-      />
-      <RatingChoice
-        label="ความชัดเจน/เข้าใจง่าย"
-        value={selection.clarity}
-        onChange={(clarity) => updateSelection({ clarity })}
-      />
+      {postInterfaceQuestions.map((question, index) => (
+        <RatingChoice
+          key={question.field}
+          label={`Q${index + 1}: ${question.text}`}
+          construct={question.construct}
+          value={selection[question.field]}
+          onChange={(value) => updateSelection({ [question.field]: value })}
+        />
+      ))}
       <button className="primary" disabled={!canContinue} onClick={onContinue}>บันทึกและไปต่อ</button>
     </aside>
   );
 }
 
-function RatingChoice({ label, value, onChange }) {
+function RatingChoice({ label, construct, value, onChange }) {
   return (
     <fieldset className="rating-choice">
       <legend>{label}</legend>
+      <p>{construct}</p>
       <div>
-        {[1, 2, 3, 4, 5].map((score) => (
-          <label key={score} className={String(value) === String(score) ? "selected" : ""}>
+        {agreementScaleOptions.map((option) => (
+          <label key={option.value} className={String(value) === String(option.value) ? "selected" : ""}>
             <input
               type="radio"
               name={label}
-              value={score}
-              checked={String(value) === String(score)}
-              onChange={() => onChange(score)}
+              value={option.value}
+              checked={String(value) === String(option.value)}
+              onChange={() => onChange(option.value)}
             />
-            <span>{score}</span>
+            <span>
+              <strong>{option.value}</strong>
+              <small>{option.label}</small>
+            </span>
           </label>
         ))}
       </div>

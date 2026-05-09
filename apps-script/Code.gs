@@ -81,8 +81,10 @@ function appendScenarios_(spreadsheet, payload) {
     "selected_lm",
     "total_time",
     "total_cost",
-    "confidence",
-    "clarity"
+    "clarity",
+    "decision_ease",
+    "fmlm_understanding",
+    "preference_fit"
   ]);
 
   (payload.scenarios || []).forEach(function(row) {
@@ -98,8 +100,10 @@ function appendScenarios_(spreadsheet, payload) {
       row.selected_lm,
       row.total_time,
       row.total_cost,
-      row.confidence,
-      row.clarity
+      row.clarity,
+      row.decision_ease,
+      row.fmlm_understanding,
+      row.preference_fit
     ]);
   });
 }
