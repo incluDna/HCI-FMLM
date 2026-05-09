@@ -223,6 +223,14 @@ export default function StudyApp() {
       .finally(() => setReady(true));
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [ready, screen, scenarioIndex, interfaceIndex]);
+
   const scenarios = useMemo(() => {
     if (!participant) return [];
     return seededShuffle(scenarioPool, participant.participant_id).slice(0, 5);
