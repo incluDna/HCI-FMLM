@@ -113,20 +113,24 @@ function appendSatisfaction_(spreadsheet, payload) {
     "timestamp",
     "participant_id",
     "condition_order",
-    "better_decide",
-    "matches_pref",
-    "would_use",
-    "comment"
+    "overall_decision_support",
+    "overall_preference_alignment",
+    "overall_clarity",
+    "overall_intention_to_use",
+    "fmlm_usefulness",
+    "final_comments"
   ]);
 
   sheet.appendRow([
     payload.timestamp,
     payload.participant_id,
     payload.condition_order,
-    payload.satisfaction.better_decide,
-    payload.satisfaction.matches_pref,
-    payload.satisfaction.would_use,
-    payload.satisfaction.comment
+    payload.satisfaction.overall_decision_support,
+    payload.satisfaction.overall_preference_alignment,
+    payload.satisfaction.overall_clarity,
+    payload.satisfaction.overall_intention_to_use,
+    payload.satisfaction.fmlm_usefulness,
+    payload.satisfaction.final_comments
   ]);
 }
 

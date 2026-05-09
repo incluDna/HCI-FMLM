@@ -75,16 +75,52 @@ const agreementScaleOptions = [
   { value: 5, label: "เห็นด้วยอย่างยิ่ง" }
 ];
 const satisfactionOptions = [
-  "แอป A ดีกว่ามาก",
-  "แอป A ดีกว่าเล็กน้อย",
-  "เท่ากัน",
-  "แอป B ดีกว่าเล็กน้อย",
-  "แอป B ดีกว่ามาก"
+  { value: 1, label: "แอป A ดีกว่ามาก" },
+  { value: 2, label: "แอป A ดีกว่าเล็กน้อย" },
+  { value: 3, label: "พอ ๆ กัน" },
+  { value: 4, label: "แอป B ดีกว่าเล็กน้อย" },
+  { value: 5, label: "แอป B ดีกว่ามาก" }
+];
+const fmlmUsefulnessOptions = [
+  { value: 1, label: "ไม่มีประโยชน์เลย" },
+  { value: 2, label: "ไม่ค่อยมีประโยชน์" },
+  { value: 3, label: "ปานกลาง" },
+  { value: 4, label: "ค่อนข้างมีประโยชน์" },
+  { value: 5, label: "มีประโยชน์มาก" }
+];
+const finalComparativeQuestions = [
+  {
+    field: "overall_decision_support",
+    text: "แอปใดช่วยให้คุณตัดสินใจเลือกเส้นทางได้ดีกว่า",
+    construct: "Overall decision support"
+  },
+  {
+    field: "overall_preference_alignment",
+    text: "แอปใดช่วยให้คุณเลือกเส้นทางที่ตรงกับความต้องการของคุณมากกว่า",
+    construct: "Preference alignment"
+  },
+  {
+    field: "overall_clarity",
+    text: "แอปใดทำให้คุณเข้าใจตัวเลือกการเดินทางได้ชัดเจนกว่า",
+    construct: "Overall clarity"
+  },
+  {
+    field: "overall_intention_to_use",
+    text: "หากต้องใช้งานจริงในชีวิตประจำวัน คุณอยากใช้แอปใดมากกว่า",
+    construct: "Behavioral intention to use"
+  }
 ];
 const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL || process.env.VITE_SHEET_URL || "";
 
 const initialBackground = { freq: "", modes: [], appUsage: "", multiLegFamiliarity: "" };
-const initialSatisfaction = { better_decide: "", matches_pref: "", would_use: "", comment: "" };
+const initialSatisfaction = {
+  overall_decision_support: "",
+  overall_preference_alignment: "",
+  overall_clarity: "",
+  overall_intention_to_use: "",
+  fmlm_usefulness: "",
+  final_comments: ""
+};
 const eventQueueKey = "fmlm_event_queue";
 
 function defaultSelection(scenario) {
@@ -897,35 +933,87 @@ function RatingChoice({ label, construct, value, onChange }) {
 }
 
 function Satisfaction({ satisfaction, setSatisfaction, onSubmit, submitState }) {
-  const questions = [
-    ["better_decide", "แอปใดช่วยให้คุณตัดสินใจเลือกเส้นทางได้ดีกว่า"],
-    ["matches_pref", "แอปใดช่วยให้คุณเลือกเส้นทางที่ตรงกับความชอบมากกว่า"],
-    ["would_use", "แอปใดที่คุณอยากใช้จริงในชีวิตประจำวัน"]
-  ];
-  const ready = questions.every(([id]) => satisfaction[id]);
+  const ready =
+    finalComparativeQuestions.every((question) => satisfaction[question.field]) &&
+    satisfaction.fmlm_usefulness;
   return (
-    <section className="page">
-      <h1>Final satisfaction</h1>
-      {questions.map(([id, label]) => (
-        <div className="question-block" key={id}>
-          <h2>{label}</h2>
-          <RadioList
-            name={id}
+    <section className="page final-page">
+      <div className="page-intro">
+        <p className="eyebrow">Final questionnaire</p>
+        <h1>ความคิดเห็นโดยรวมหลังการทดลอง</h1>
+        <p>หลังจากได้ทดลองใช้งานทั้งสองรูปแบบ กรุณาเปรียบเทียบประสบการณ์โดยรวมของคุณ</p>
+      </div>
+
+      <section className="question-block final-section">
+        <h2>ส่วนที่ 1: การเปรียบเทียบระหว่างแอป</h2>
+        <p className="scale-note">1 = แอป A ดีกว่ามาก · 2 = แอป A ดีกว่าเล็กน้อย · 3 = พอ ๆ กัน · 4 = แอป B ดีกว่าเล็กน้อย · 5 = แอป B ดีกว่ามาก</p>
+        {finalComparativeQuestions.map((question, index) => (
+          <FinalQuestion
+            key={question.field}
+            number={index + 1}
+            question={question}
             options={satisfactionOptions}
-            value={satisfaction[id]}
-            onChange={(value) => setSatisfaction((prev) => ({ ...prev, [id]: value }))}
+            value={satisfaction[question.field]}
+            onChange={(value) => setSatisfaction((prev) => ({ ...prev, [question.field]: value }))}
           />
-        </div>
-      ))}
-      <label className="comment-box">
-        ความคิดเห็นเพิ่มเติม
-        <textarea value={satisfaction.comment} onChange={(event) => setSatisfaction((prev) => ({ ...prev, comment: event.target.value }))} />
-      </label>
+        ))}
+      </section>
+
+      <section className="question-block final-section">
+        <h2>ส่วนที่ 2: ประโยชน์ของข้อมูล First Mile / Last Mile</h2>
+        <FinalQuestion
+          number={5}
+          question={{
+            field: "fmlm_usefulness",
+            text: "การแสดงข้อมูลช่วงต้นทาง–ช่วงหลัก–ช่วงปลายทาง (First Mile / Main Transit / Last Mile) มีประโยชน์ต่อคุณเพียงใด",
+            construct: "Perceived usefulness of FMLM visualization"
+          }}
+          options={fmlmUsefulnessOptions}
+          value={satisfaction.fmlm_usefulness}
+          onChange={(value) => setSatisfaction((prev) => ({ ...prev, fmlm_usefulness: value }))}
+        />
+      </section>
+
+      <section className="question-block final-section">
+        <h2>ส่วนที่ 3: ความคิดเห็นเพิ่มเติม</h2>
+        <label className="comment-box">
+          Q6: ความคิดเห็นเพิ่มเติมเกี่ยวกับระบบนี้ (ไม่บังคับ)
+          <textarea
+            placeholder="เช่น สิ่งที่ชอบ สิ่งที่ควรปรับปรุง หรือข้อเสนอแนะอื่น ๆ"
+            value={satisfaction.final_comments}
+            onChange={(event) => setSatisfaction((prev) => ({ ...prev, final_comments: event.target.value }))}
+          />
+        </label>
+      </section>
       {submitState === "error" && <p className="error">ส่งข้อมูลไม่สำเร็จ กรุณาตรวจสอบ Sheet URL แล้วลองอีกครั้ง</p>}
       <button className="primary" disabled={!ready || submitState === "submitting"} onClick={onSubmit}>
         {submitState === "submitting" ? "กำลังส่ง..." : "ส่งคำตอบสุดท้าย"}
       </button>
     </section>
+  );
+}
+
+function FinalQuestion({ number, question, options, value, onChange }) {
+  return (
+    <fieldset className="final-question">
+      <legend>Q{number}: {question.text}</legend>
+      <p>{question.construct}</p>
+      <div className="final-scale">
+        {options.map((option) => (
+          <label key={option.value} className={Number(value) === option.value ? "selected" : ""}>
+            <input
+              type="radio"
+              name={question.field}
+              value={option.value}
+              checked={Number(value) === option.value}
+              onChange={() => onChange(option.value)}
+            />
+            <strong>{option.value}</strong>
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
