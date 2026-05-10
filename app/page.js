@@ -755,7 +755,7 @@ function BaselineInterface({ scenario, selection, updateSelection }) {
         }}
       />
       <div className="baseline-routes">
-        {scenario.main_routes.slice(0, 3).map((route, index) => {
+        {scenario.main_routes.map((route, index) => {
           const fm = scenario.first_mile.find((item) => route.first_miles.includes(item.id)) || scenario.first_mile[0];
           const lm = scenario.last_mile.find((item) => route.last_miles.includes(item.id)) || scenario.last_mile[0];
           const totalTime = (fm?.time_min || 0) + route.time_min + (lm?.time_min || 0);

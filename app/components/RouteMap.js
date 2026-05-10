@@ -62,7 +62,7 @@ export default function RouteMap({
     scenario.main_routes[0];
 
   const layers = useMemo(() => {
-    const mainRoutes = mode === "baseline" ? scenario.main_routes.slice(0, 3) : scenario.main_routes;
+    const mainRoutes = scenario.main_routes;
     const output = [];
 
     mainRoutes.forEach((route, index) => {
@@ -170,7 +170,7 @@ export default function RouteMap({
       <div className="map-legend osm-legend">
         {mode === "baseline" ? (
           <>
-            <span><i className="simple" />Route A/B/C</span>
+            <span><i className="simple" />Routes</span>
             <span><i className="selected" />Selected</span>
           </>
         ) : (
