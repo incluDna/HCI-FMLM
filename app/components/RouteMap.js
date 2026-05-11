@@ -66,10 +66,31 @@ export default function RouteMap({
     const output = [];
 
     mainRoutes.forEach((route, index) => {
+      if (mode === "baseline") {
+        const fm = preferredLinkedConnector(scenario.first_mile, route.first_miles);
+        const lm = preferredLinkedConnector(scenario.last_mile, route.last_miles);
+        const active = route.id === selection?.selected_main;
+        [
+          fm && { route: fm, section: "fm" },
+          { route, section: "main" },
+          lm && { route: lm, section: "lm" }
+        ].filter(Boolean).forEach((segment) => {
+          output.push({
+            id: `${route.id}-${segment.section}`,
+            type: "simple",
+            label: `Route ${String.fromCharCode(65 + index)}`,
+            active,
+            points: pointsForRoute(segment.route, origin, destination, index, segment.section),
+            onClick: () => onSelectMain?.(route.id)
+          });
+        });
+        return;
+      }
+
       output.push({
         id: route.id,
-        type: mode === "baseline" ? "simple" : "main",
-        label: mode === "baseline" ? `Route ${String.fromCharCode(65 + index)}` : route.mode,
+        type: "main",
+        label: route.mode,
         active: route.id === selection?.selected_main,
         points: pointsForRoute(route, origin, destination, index, "main"),
         onClick: () => onSelectMain?.(route.id)
@@ -146,8 +167,8 @@ export default function RouteMap({
             positions={layer.points.map((point) => [point.lat, point.lng])}
             pathOptions={{
               color: colorForLayer(layer.type, layer.active),
-              weight: layer.active ? 7 : 4,
-              opacity: layer.active ? 0.92 : 0.36,
+              weight: layer.active ? 7 : 5,
+              opacity: layer.active ? 0.94 : 0.62,
               dashArray: layer.type === "fm" || layer.type === "lm" ? "6 8" : undefined
             }}
             eventHandlers={{ click: layer.onClick }}
@@ -207,6 +228,14 @@ function normalizePoint(point) {
   const lat = Number(point.lat);
   const lng = Number(point.lng);
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function preferredLinkedConnector(items, ids = []) {
+  const linked = items.filter((item) => ids.includes(item.id));
+  return linked.find((item) => {
+    const text = `${item.mode_en || ""} ${item.mode || ""}`.toLowerCase();
+    return text.includes("walk") || text.includes("เดิน");
+  }) || linked[0];
 }
 
 function colorForLayer(type, active) {

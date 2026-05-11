@@ -7,7 +7,6 @@ import {
   computeTotals,
   conditionForCounter,
   findMainRoute,
-  findOption,
   interfaceLabel,
   interfacesForCondition,
   makeParticipant,
@@ -731,6 +730,15 @@ function ScenarioScreen({
 }
 
 function BaselineInterface({ scenario, selection, updateSelection }) {
+  function selectRoute(route) {
+    const bundle = routeBundleForMain(scenario, route, "walk");
+    updateSelection({
+      selected_main: route.id,
+      selected_fm: bundle.fm?.id || selection.selected_fm,
+      selected_lm: bundle.lm?.id || selection.selected_lm
+    });
+  }
+
   return (
     <div className="baseline-shell">
       <div className="baseline-title">
@@ -745,47 +753,44 @@ function BaselineInterface({ scenario, selection, updateSelection }) {
         selection={selection}
         onSelectMain={(selected_main) => {
           const route = findMainRoute(scenario, selected_main);
-          const fm = scenario.first_mile.find((item) => route?.first_miles.includes(item.id)) || scenario.first_mile[0];
-          const lm = scenario.last_mile.find((item) => route?.last_miles.includes(item.id)) || scenario.last_mile[0];
+          const bundle = route ? routeBundleForMain(scenario, route, "walk") : {};
           updateSelection({
             selected_main,
-            selected_fm: fm?.id || selection.selected_fm,
-            selected_lm: lm?.id || selection.selected_lm
+            selected_fm: bundle.fm?.id || selection.selected_fm,
+            selected_lm: bundle.lm?.id || selection.selected_lm
           });
         }}
       />
       <div className="baseline-routes">
         {scenario.main_routes.map((route, index) => {
-          const fm = scenario.first_mile.find((item) => route.first_miles.includes(item.id)) || scenario.first_mile[0];
-          const lm = scenario.last_mile.find((item) => route.last_miles.includes(item.id)) || scenario.last_mile[0];
-          const totalTime = (fm?.time_min || 0) + route.time_min + (lm?.time_min || 0);
-          const totalCost = (fm?.cost_thb || 0) + route.cost_thb + (lm?.cost_thb || 0);
+          const { fm, lm, totalTime, totalCost, connectorDistance } = routeBundleForMain(scenario, route, "walk");
           const active = selection.selected_main === route.id;
           return (
             <button
               key={route.id}
               className={active ? "baseline-route selected" : "baseline-route"}
-              onClick={() =>
-                updateSelection({
-                  selected_main: route.id,
-                  selected_fm: fm?.id || selection.selected_fm,
-                  selected_lm: lm?.id || selection.selected_lm
-                })
-              }
+              onClick={() => selectRoute(route)}
             >
-              <span className="route-letter">Route {String.fromCharCode(65 + index)}</span>
-              <span className="baseline-icons" aria-label="Route modes">
-                <i>{fm?.icon}</i>
-                <i>{route.icon}</i>
-                <i>{lm?.icon}</i>
+              <span className="route-letter">
+                Route {String.fromCharCode(65 + index)}
+                <small>{fm?.mode || "เดิน"} → {route.mode} → {lm?.mode || "เดิน"}</small>
               </span>
               <span className="baseline-total">
                 <strong>{totalTime} นาที</strong>
-                <small>total time</small>
+                <small>{fm?.time_min || 0} + {route.time_min || 0} + {lm?.time_min || 0} นาที</small>
               </span>
               <span className="baseline-total">
                 <strong>{totalCost} บาท</strong>
-                <small>total cost</small>
+                <small>{route.transfers || 0} transfers</small>
+              </span>
+              <span className="baseline-total">
+                <strong>~{connectorDistance} ม.</strong>
+                <small>เดิน/เชื่อมต่อรวม</small>
+              </span>
+              <span className="baseline-route-detail">
+                <span>{fm?.icon} {fm?.detail || fm?.mode}</span>
+                <span>{route.icon} {route.detail || route.mode}</span>
+                <span>{lm?.icon} {lm?.detail || lm?.mode}</span>
               </span>
             </button>
           );
@@ -823,6 +828,7 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
   const firstMileItems = scenario.first_mile.filter((item) => !main || main.first_miles.includes(item.id));
   const lastMileItems = scenario.last_mile.filter((item) => !main || main.last_miles.includes(item.id));
   const visibleSections = filter === "all" ? ["main", "fm", "lm"] : [filter];
+  const recommendations = recommendationBundles(scenario);
 
   function selectMainRoute(selected_main) {
     const nextMain = findMainRoute(scenario, selected_main);
@@ -850,12 +856,6 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
         <span>ปลายทาง</span>
         <strong>{scenario.destination}</strong>
       </div>
-      <div className="insight-chips">
-        <span>🏍️ วินมอเตอร์ไซค์ใกล้เคียง: {scenario.first_mile.filter((x) => x.mode_en.includes("motorcycle")).length} จุด</span>
-        <span>🚲 Pun Pun ใกล้ต้นทาง: {scenario.first_mile.filter((x) => x.mode_en.includes("bike")).length} จุด</span>
-        <span>⛵ เรือ: {scenario.main_routes.some((route) => route.mode.includes("เรือ")) ? "มีเส้นทางนี้" : "ไม่มี"}</span>
-        <span>🚕 แท็กซี่เริ่ม 35B</span>
-      </div>
       <RouteMap
         mode="prototype"
         scenario={scenario}
@@ -865,10 +865,22 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
         onSelectLastMile={(selected_lm) => updateSelection({ selected_lm })}
       />
       <div className="proto-summary">
-        <div><span>เร็วที่สุด</span><strong>{totals.total_time} นาที</strong><small>{main?.mode}</small></div>
-        <div><span>ถูกที่สุด</span><strong>{totals.total_cost}B</strong><small>{findOption(scenario, "first_mile", selection.selected_fm)?.mode}</small></div>
-        <div><span>แนะนำ</span><strong>{totals.total_time} นาที / {totals.total_cost}B</strong><small>สมดุลเวลาและราคา</small></div>
-        <div><span>ระยะทาง FMLM</span><strong>~{totals.distance_m} ม.</strong><small>First + Last mile</small></div>
+        {recommendations.map((item) => (
+          <button
+            key={item.kind}
+            className="summary-choice"
+            onClick={() => updateSelection({
+              selected_main: item.main.id,
+              selected_fm: item.fm.id,
+              selected_lm: item.lm.id
+            })}
+          >
+            <span>{item.label}</span>
+            <strong>{item.totalTime} นาที / {item.totalCost}B</strong>
+            <small>{item.fm.mode} → {item.main.mode} → {item.lm.mode}</small>
+            <small>~{item.connectorDistance} ม. · {item.main.transfers || 0} transfers</small>
+          </button>
+        ))}
       </div>
       <div className="segmented">
         {["all", "fm", "main", "lm"].map((id) => (
@@ -909,6 +921,60 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
       )}
     </div>
   );
+}
+
+function routeBundleForMain(scenario, route, connectorPreference = "first") {
+  const linkedFm = scenario.first_mile.filter((item) => route.first_miles?.includes(item.id));
+  const linkedLm = scenario.last_mile.filter((item) => route.last_miles?.includes(item.id));
+  const fm = connectorPreference === "walk" ? preferredWalk(linkedFm) : linkedFm[0];
+  const lm = connectorPreference === "walk" ? preferredWalk(linkedLm) : linkedLm[0];
+  const connectorDistance = Number(fm?.distance_m || 0) + Number(lm?.distance_m || 0);
+  return {
+    fm,
+    main: route,
+    lm,
+    connectorDistance,
+    totalTime: Number(fm?.time_min || 0) + Number(route.time_min || 0) + Number(lm?.time_min || 0),
+    totalCost: Number(fm?.cost_thb || 0) + Number(route.cost_thb || 0) + Number(lm?.cost_thb || 0)
+  };
+}
+
+function preferredWalk(items) {
+  return items.find((item) => {
+    const text = `${item.mode_en || ""} ${item.mode || ""}`.toLowerCase();
+    return text.includes("walk") || text.includes("เดิน");
+  }) || items[0];
+}
+
+function recommendationBundles(scenario) {
+  const bundles = scenario.main_routes.flatMap((main) => {
+    const fms = scenario.first_mile.filter((item) => main.first_miles?.includes(item.id));
+    const lms = scenario.last_mile.filter((item) => main.last_miles?.includes(item.id));
+    return fms.flatMap((fm) => lms.map((lm) => {
+      const connectorDistance = Number(fm.distance_m || 0) + Number(lm.distance_m || 0);
+      return {
+        fm,
+        main,
+        lm,
+        connectorDistance,
+        totalTime: Number(fm.time_min || 0) + Number(main.time_min || 0) + Number(lm.time_min || 0),
+        totalCost: Number(fm.cost_thb || 0) + Number(main.cost_thb || 0) + Number(lm.cost_thb || 0)
+      };
+    }));
+  });
+
+  const fastest = minBy(bundles, (item) => item.totalTime);
+  const cheapest = minBy(bundles, (item) => item.totalCost);
+  const shortestConnector = minBy(bundles, (item) => item.connectorDistance);
+  return [
+    fastest && { ...fastest, kind: "fastest", label: "เร็วที่สุด" },
+    cheapest && { ...cheapest, kind: "cheapest", label: "ถูกที่สุด" },
+    shortestConnector && { ...shortestConnector, kind: "shortest", label: "เชื่อมต่อสั้นที่สุด" }
+  ].filter(Boolean);
+}
+
+function minBy(items, score) {
+  return items.reduce((best, item) => !best || score(item) < score(best) ? item : best, null);
 }
 
 function FmlmTable({ title, tag, color, items, selected, onSelect }) {
@@ -953,12 +1019,21 @@ function FmlmTable({ title, tag, color, items, selected, onSelect }) {
             <strong>{item.mode} {item.time_min === bestTime && <em>ดีที่สุด</em>}</strong>
             <small>{item.detail}</small>
           </span>
-          <span className="row-frequency">{item.reliability === "สูง" ? "ทุก 3–5 นาที" : item.reliability === "กลาง" ? "ทุก 10 นาที" : "ไม่แน่นอน"}</span>
+          <span className="row-frequency">{routeInfoLine(item)}</span>
           <span className="row-price">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
         </button>
       ))}
     </section>
   );
+}
+
+function routeInfoLine(item) {
+  const parts = [];
+  if (item.distance_m) parts.push(`~${item.distance_m} ม.`);
+  if (item.distance_km) parts.push(`~${item.distance_km} กม.`);
+  if (Number.isFinite(Number(item.transfers))) parts.push(`${Number(item.transfers)} transfers`);
+  if (item.reliability) parts.push(`ความแน่นอน: ${item.reliability}`);
+  return parts.join(" · ");
 }
 
 function RatingPanel({ selection, updateSelection, totals, onContinue }) {

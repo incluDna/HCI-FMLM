@@ -695,10 +695,10 @@ main {
 .baseline-route {
   width: 100%;
   display: grid;
-  grid-template-columns: 110px 1fr 150px 150px;
-  gap: 14px;
+  grid-template-columns: minmax(160px, 1.2fr) repeat(3, minmax(110px, 0.7fr));
+  gap: 10px 14px;
   align-items: center;
-  min-height: 92px;
+  min-height: 112px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -713,8 +713,17 @@ main {
 }
 
 .route-letter {
+  display: grid;
+  gap: 5px;
   font-weight: 900;
   font-size: 1.08rem;
+}
+
+.route-letter small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .baseline-icons {
@@ -750,6 +759,21 @@ main {
   font-size: 0.72rem;
 }
 
+.baseline-route-detail {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(217, 216, 208, 0.75);
+  color: #3f473f;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.baseline-route-detail span {
+  display: block;
+}
+
 .option-group {
   padding: 14px;
 }
@@ -771,6 +795,10 @@ main {
   background: #f5f1e7;
   outline: 2px solid rgba(245, 158, 11, 0.35);
   border-radius: 6px;
+}
+
+.route-card:not(.selected), .fmlm-row:not(.selected) {
+  opacity: 0.86;
 }
 
 .route-icon {
@@ -918,26 +946,46 @@ main {
 
 .proto-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
   border: 2px solid #74a9ff;
   border-radius: 8px;
   background: #d9ebff;
 }
 
-.proto-summary div {
+.summary-choice {
   display: grid;
-  gap: 4px;
+  gap: 3px;
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid rgba(45, 112, 180, 0.34);
+  border-radius: 7px;
+  background: rgba(255, 254, 250, 0.7);
+  text-align: left;
 }
 
-.proto-summary span, .proto-summary small {
+.summary-choice span, .summary-choice small {
   color: #2b65a7;
 }
 
-.proto-summary strong {
+.summary-choice span {
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.summary-choice strong {
   color: #1f5aa5;
-  font-size: 1.25rem;
+  font-size: 1.02rem;
+}
+
+.summary-choice small {
+  line-height: 1.25;
+}
+
+.summary-choice:hover {
+  border-color: #1f5aa5;
+  background: #fff;
 }
 
 .segmented {
@@ -1617,6 +1665,10 @@ main {
   }
 
   .baseline-route {
+    grid-template-columns: 1fr;
+  }
+
+  .proto-summary {
     grid-template-columns: 1fr;
   }
 
