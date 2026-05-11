@@ -120,6 +120,7 @@ export default function AdminPage() {
         </div>
         <div className="admin-actions">
           <a className="secondary-link" href="/">Back to study</a>
+          <a className="secondary-link" href="/admin/results">Results</a>
           <form action="/api/admin-logout" method="post">
             <button type="submit">Log out</button>
           </form>
