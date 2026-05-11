@@ -1,6 +1,6 @@
 "use client";
 
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import { useEffect, useMemo } from "react";
 import { boundsForPointSets, pointsForRoute } from "@/lib/gpx";
 
@@ -54,8 +54,8 @@ export default function RouteMap({
   onSelectLastMile,
   height = 420
 }) {
-  const origin = scenario.origin_coords;
-  const destination = scenario.destination_coords;
+  const origin = normalizePoint(scenario.origin_coords);
+  const destination = normalizePoint(scenario.destination_coords);
 
   const selectedMain =
     scenario.main_routes.find((route) => route.id === selection?.selected_main) ||
@@ -140,16 +140,6 @@ export default function RouteMap({
         />
         <FitBounds bounds={bounds} />
         <CtrlWheelZoom />
-        {origin && (
-          <Marker position={[origin.lat, origin.lng]}>
-            <Popup>Origin: {scenario.origin}</Popup>
-          </Marker>
-        )}
-        {destination && (
-          <Marker position={[destination.lat, destination.lng]}>
-            <Popup>Destination: {scenario.destination}</Popup>
-          </Marker>
-        )}
         {layers.map((layer) => (
           <Polyline
             key={`${layer.type}-${layer.id}`}
@@ -165,6 +155,24 @@ export default function RouteMap({
             <Popup>{layer.label}</Popup>
           </Polyline>
         ))}
+        {origin && (
+          <CircleMarker
+            center={[origin.lat, origin.lng]}
+            radius={10}
+            pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 }}
+          >
+            <Popup>Origin: {scenario.origin}</Popup>
+          </CircleMarker>
+        )}
+        {destination && (
+          <CircleMarker
+            center={[destination.lat, destination.lng]}
+            radius={10}
+            pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#dc2626", fillOpacity: 1 }}
+          >
+            <Popup>Destination: {scenario.destination}</Popup>
+          </CircleMarker>
+        )}
       </MapContainer>
       <div className="map-zoom-hint">Ctrl + scroll เพื่อซูมแผนที่</div>
       <div className="map-legend osm-legend">
@@ -183,6 +191,22 @@ export default function RouteMap({
       </div>
     </div>
   );
+}
+
+function normalizePoint(point) {
+  if (!point) return null;
+  if (Array.isArray(point) && point.length >= 2) {
+    const lat = Number(point[0]);
+    const lng = Number(point[1]);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+  if (typeof point === "string") {
+    const [lat, lng] = point.split(",").map((part) => Number(part.trim()));
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+  const lat = Number(point.lat);
+  const lng = Number(point.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
 function colorForLayer(type, active) {
