@@ -5,12 +5,14 @@ import dynamic from "next/dynamic";
 import { scenarioDb, preferenceFactors } from "@/lib/scenarios";
 import {
   computeTotals,
+  computePreferenceFit,
   conditionForCounter,
   findMainRoute,
   interfaceLabel,
   interfacesForCondition,
   makeParticipant,
   seededShuffle,
+  summarizePreferenceScores,
   storageGet,
   storageSet
 } from "@/lib/experiment";
@@ -297,6 +299,7 @@ export default function StudyApp() {
 
   function saveScenarioRecord() {
     const totals = computeTotals(currentScenario, currentSelection);
+    const preferenceScore = computePreferenceFit(currentScenario, currentSelection, ranking, currentInterface);
     const savedRecord = {
       scenario_id: currentScenario.id,
       interface: interfaceLabel(currentInterface, participant.condition_order),
@@ -306,10 +309,13 @@ export default function StudyApp() {
       selected_lm: currentSelection.selected_lm,
       total_time: totals.total_time,
       total_cost: totals.total_cost,
+      distance_m: totals.distance_m,
+      transfers: totals.transfers,
       clarity: Number(currentSelection.clarity),
       decision_ease: Number(currentSelection.decision_ease),
       fmlm_understanding: Number(currentSelection.fmlm_understanding),
-      preference_fit: Number(currentSelection.preference_fit)
+      preference_fit: Number(currentSelection.preference_fit),
+      ...preferenceScore
     };
     logEvent({
       event_type: "rating_submitted",
@@ -365,6 +371,7 @@ export default function StudyApp() {
       ...satisfaction,
       ...decodedSatisfaction
     };
+    const summaryScores = summarizePreferenceScores(records);
     const payload = {
       timestamp: new Date().toISOString(),
       participant_id: participant.participant_id,
@@ -372,6 +379,7 @@ export default function StudyApp() {
       background,
       preference_ranking: ranking.map((item) => item.id),
       scenarios: records,
+      summary_scores: summaryScores,
       satisfaction: satisfactionWithInterfaceTypes
     };
     storageSet(`fmlm_submission_${participant.participant_id}`, payload);
@@ -392,6 +400,7 @@ export default function StudyApp() {
         screen: "thanks",
         payload: {
           scenario_records: records.length,
+          summary_scores: summaryScores,
           satisfaction: satisfactionWithInterfaceTypes
         }
       });
