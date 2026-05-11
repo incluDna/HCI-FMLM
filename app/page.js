@@ -773,7 +773,7 @@ function BaselineInterface({ scenario, selection, updateSelection }) {
             >
               <span className="route-letter">
                 Route {String.fromCharCode(65 + index)}
-                <small>{fm?.mode || "เดิน"} → {route.mode} → {lm?.mode || "เดิน"}</small>
+                <small>{displayMode(fm) || "เดิน"} → {displayMode(route)} → {displayMode(lm) || "เดิน"}</small>
               </span>
               <span className="baseline-total">
                 <strong>{totalTime} นาที</strong>
@@ -781,16 +781,16 @@ function BaselineInterface({ scenario, selection, updateSelection }) {
               </span>
               <span className="baseline-total">
                 <strong>{totalCost} บาท</strong>
-                <small>{route.transfers || 0} transfers</small>
+                <small>{transferText(route.transfers)}</small>
               </span>
               <span className="baseline-total">
                 <strong>~{connectorDistance} ม.</strong>
                 <small>เดิน/เชื่อมต่อรวม</small>
               </span>
               <span className="baseline-route-detail">
-                <span>{fm?.icon} {fm?.detail || fm?.mode}</span>
-                <span>{route.icon} {route.detail || route.mode}</span>
-                <span>{lm?.icon} {lm?.detail || lm?.mode}</span>
+                <span>{fm?.icon} {displayDetail(fm)}</span>
+                <span>{route.icon} {displayDetail(route)}</span>
+                <span>{lm?.icon} {displayDetail(lm)}</span>
               </span>
             </button>
           );
@@ -812,8 +812,8 @@ function OptionCards({ title, items, selected, onSelect }) {
         >
           <span className="route-icon">{item.icon}</span>
           <span>
-            <strong>{item.mode}</strong>
-            <small>{item.detail}</small>
+            <strong>{displayMode(item)}</strong>
+            <small>{displayDetail(item)}</small>
           </span>
           <span className="route-metrics">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
         </button>
@@ -877,8 +877,8 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
           >
             <span>{item.label}</span>
             <strong>{item.totalTime} นาที / {item.totalCost}B</strong>
-            <small>{item.fm.mode} → {item.main.mode} → {item.lm.mode}</small>
-            <small>~{item.connectorDistance} ม. · {item.main.transfers || 0} transfers</small>
+            <small>{displayMode(item.fm)} → {displayMode(item.main)} → {displayMode(item.lm)}</small>
+            <small>~{item.connectorDistance} ม. · {transferText(item.main.transfers)}</small>
           </button>
         ))}
       </div>
@@ -1016,8 +1016,8 @@ function FmlmTable({ title, tag, color, items, selected, onSelect }) {
         <button key={item.id} className={selected === item.id ? "fmlm-row selected" : "fmlm-row"} onClick={() => onSelect(item.id)}>
           <span className="route-icon">{item.icon}</span>
           <span className="row-detail">
-            <strong>{item.mode} {item.time_min === bestTime && <em>ดีที่สุด</em>}</strong>
-            <small>{item.detail}</small>
+            <strong>{displayMode(item)} {item.time_min === bestTime && <em>ดีที่สุด</em>}</strong>
+            <small>{displayDetail(item)}</small>
           </span>
           <span className="row-frequency">{routeInfoLine(item)}</span>
           <span className="row-price">{item.time_min} นาที<br />{item.cost_thb ? `${item.cost_thb}B` : "ฟรี"}</span>
@@ -1031,9 +1031,85 @@ function routeInfoLine(item) {
   const parts = [];
   if (item.distance_m) parts.push(`~${item.distance_m} ม.`);
   if (item.distance_km) parts.push(`~${item.distance_km} กม.`);
-  if (Number.isFinite(Number(item.transfers))) parts.push(`${Number(item.transfers)} transfers`);
+  if (Number.isFinite(Number(item.transfers))) parts.push(transferText(item.transfers));
   if (item.reliability) parts.push(`ความแน่นอน: ${item.reliability}`);
   return parts.join(" · ");
+}
+
+function displayMode(item) {
+  if (!item) return "";
+  const raw = cleanRouteText(item.mode || item.mode_en || "");
+  const modeEn = String(item.mode_en || "").toLowerCase();
+  const icon = item.icon || "";
+
+  if (modeEn.includes("walk") || raw.toLowerCase() === "walking") return "เดิน";
+  if (modeEn.includes("motorcycle")) return raw.includes("GrabBike") ? "วินมอเตอร์ไซค์/GrabBike" : "วินมอเตอร์ไซค์";
+  if (modeEn.includes("taxi")) return raw.includes("tuk-tuk") ? "รถต่อสั้น ๆ / Taxi" : "Taxi/Grab";
+  if (modeEn.includes("bike")) return raw.includes("Pun Pun") ? "จักรยาน Pun Pun" : "จักรยาน";
+  if (modeEn.includes("shuttle")) return "รถรับส่ง";
+  if (modeEn.includes("songthaew")) return "สองแถว/รถเมล์ท้องถิ่น";
+  if (modeEn.includes("tuk-tuk")) return raw.includes("MuvMi") ? "MuvMi/tuk-tuk" : "tuk-tuk";
+
+  if (/^Road:/i.test(item.mode || "") || icon.includes("🚕")) return "Taxi/Grab โดยตรง";
+  if (icon.includes("🚌")) return raw.replace(/^Bus\s*/i, "รถเมล์ ");
+  if (icon.includes("🚐")) return raw.replace(/^Van\s*/i, "รถตู้ ");
+  if (icon.includes("🚈") || icon.includes("🚇") || icon.includes("🚆")) return cleanTransitMode(raw);
+  if (icon.includes("⛵")) return raw.replace(/^Boat\s*/i, "เรือ ");
+
+  return raw || "ตัวเลือกเส้นทาง";
+}
+
+function transferText(value) {
+  const transfers = Number(value || 0);
+  return transfers > 0 ? `ต่อ ${transfers} ครั้ง` : "ไม่ต้องต่อ";
+}
+
+function displayDetail(item) {
+  if (!item) return "";
+  const mode = displayMode(item);
+  const raw = cleanRouteText(item.detail || item.mode || "");
+  const withoutPrefix = raw.replace(new RegExp(`^${escapeRegExp(cleanRouteText(item.mode || ""))}\\s*:?\\s*`, "i"), "");
+  const distanceMatch = raw.match(/(?:\?|·)?\s*(\d+(?:\.\d+)?)\s*km/i);
+  const distance = distanceMatch ? `ประมาณ ${Number(distanceMatch[1]).toFixed(1)} กม.` : "";
+  const cleaned = withoutPrefix
+    .replace(/\s*\?\s*\d+(?:\.\d+)?\s*km/i, "")
+    .replace(/\s*·\s*\d+(?:\.\d+)?\s*กม\./i, "")
+    .trim();
+
+  if (cleaned && cleaned !== mode) {
+    return distance ? `${cleaned} · ${distance}` : cleaned;
+  }
+  if (distance) return distance;
+  if (item.distance_m) return `${mode}ประมาณ ${item.distance_m} ม.`;
+  if (item.distance_km) return `${mode}ประมาณ ${item.distance_km} กม.`;
+  return mode;
+}
+
+function cleanTransitMode(text) {
+  return text
+    .replace(/\bBang Khen\b/gi, "บางเขน")
+    .replace(/\bKrung Thep Aphiwat\b/gi, "กรุงเทพอภิวัฒน์")
+    .replace(/\bBang Sue\b/gi, "บางซื่อ")
+    .replace(/\bSam Yan\b/gi, "สามย่าน")
+    .replace(/\bBearing\b/gi, "แบริ่ง")
+    .replace(/\bSaint Louis\b/gi, "เซนต์หลุยส์")
+    .replace(/\bMin Buri\b/gi, "มีนบุรี")
+    .replace(/\bAsok\b/gi, "อโศก")
+    .replace(/\bMakkasan\b/gi, "มักกะสัน")
+    .replaceAll("->", "→");
+}
+
+function cleanRouteText(text = "") {
+  return String(text)
+    .replace(/^Road:\s*/i, "")
+    .replaceAll("->", "→")
+    .replace(/\s+to\s+/gi, " → ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(text = "") {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function RatingPanel({ selection, updateSelection, totals, onContinue }) {

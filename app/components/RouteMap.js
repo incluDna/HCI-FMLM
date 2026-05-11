@@ -90,7 +90,7 @@ export default function RouteMap({
       output.push({
         id: route.id,
         type: "main",
-        label: route.mode,
+        label: cleanRouteLabel(route.mode),
         active: route.id === selection?.selected_main,
         points: pointsForRoute(route, origin, destination, index, "main"),
         onClick: () => onSelectMain?.(route.id)
@@ -104,7 +104,7 @@ export default function RouteMap({
           output.push({
             id: route.id,
             type: "fm",
-            label: route.mode,
+            label: cleanRouteLabel(route.mode),
             active: route.id === selection?.selected_fm,
             points: pointsForRoute(route, origin, destination, index, "fm"),
             onClick: () => onSelectFirstMile?.(route.id)
@@ -117,7 +117,7 @@ export default function RouteMap({
           output.push({
             id: route.id,
             type: "lm",
-            label: route.mode,
+            label: cleanRouteLabel(route.mode),
             active: route.id === selection?.selected_lm,
             points: pointsForRoute(route, origin, destination, index, "lm"),
             onClick: () => onSelectLastMile?.(route.id)
@@ -240,7 +240,16 @@ function preferredLinkedConnector(items, ids = []) {
 
 function colorForLayer(type, active) {
   if (!active && type === "simple") return "#7b8794";
+  if (!active && type === "main") return "#7b8794";
   if (type === "fm") return "#7c3aed";
   if (type === "lm") return "#15916c";
   return "#1d75bd";
+}
+
+function cleanRouteLabel(value = "") {
+  return value
+    .replace(/^Road:\s*/i, "เดินทางโดยรถ")
+    .replaceAll("->", "→")
+    .replace(/\s+/g, " ")
+    .trim();
 }
