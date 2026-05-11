@@ -24,6 +24,8 @@ const blankMainRoute = {
   icon: "🚈",
   time_min: 0,
   cost_thb: 0,
+  distance_km: 0,
+  transfers: 0,
   detail: "",
   reliability: "กลาง",
   first_miles: [],
@@ -38,9 +40,8 @@ const blankMile = {
   icon: "🚶",
   time_min: 0,
   cost_thb: 0,
-  walk_m: 0,
+  distance_m: 0,
   reliability: "กลาง",
-  transfers: 0,
   detail: "",
   gpx: ""
 };
@@ -159,7 +160,7 @@ export default function AdminPage() {
           <RouteCollection
             title="Main routes"
             items={selected.main_routes}
-            fields={["id", "mode", "icon", "time_min", "cost_thb", "detail", "reliability", "first_miles", "last_miles", "gpx"]}
+            fields={["id", "mode", "icon", "time_min", "cost_thb", "distance_km", "transfers", "detail", "reliability", "first_miles", "last_miles", "gpx"]}
             relationOptions={{
               first_miles: selected.first_mile,
               last_miles: selected.last_mile
@@ -172,7 +173,7 @@ export default function AdminPage() {
           <RouteCollection
             title="First mile options"
             items={selected.first_mile}
-            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail", "gpx"]}
+            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "distance_m", "reliability", "detail", "gpx"]}
             onAdd={() => updateSelected({ first_mile: [...selected.first_mile, { ...blankMile, id: `fm-${Date.now()}` }] })}
             onChange={(index, patch) => updateListField("first_mile", index, patch)}
             onDelete={(index) => updateSelected({ first_mile: selected.first_mile.filter((_, itemIndex) => itemIndex !== index) })}
@@ -181,7 +182,7 @@ export default function AdminPage() {
           <RouteCollection
             title="Last mile options"
             items={selected.last_mile}
-            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "walk_m", "reliability", "transfers", "detail", "gpx"]}
+            fields={["id", "mode", "mode_en", "icon", "time_min", "cost_thb", "distance_m", "reliability", "detail", "gpx"]}
             onAdd={() => updateSelected({ last_mile: [...selected.last_mile, { ...blankMile, id: `lm-${Date.now()}` }] })}
             onChange={(index, patch) => updateListField("last_mile", index, patch)}
             onDelete={(index) => updateSelected({ last_mile: selected.last_mile.filter((_, itemIndex) => itemIndex !== index) })}
@@ -293,7 +294,7 @@ function RouteCollection({ title, items, fields, relationOptions = {}, onAdd, on
                     label={field}
                     value={Array.isArray(item[field]) ? item[field].join(",") : item[field]}
                     onChange={(value) => {
-                      const numeric = ["time_min", "cost_thb", "walk_m", "transfers"].includes(field);
+                      const numeric = ["time_min", "cost_thb", "distance_m", "distance_km", "transfers"].includes(field);
                       onChange(index, { [field]: numeric ? Number(value) : value });
                     }}
                   />

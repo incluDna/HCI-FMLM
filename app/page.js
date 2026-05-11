@@ -868,7 +868,7 @@ function PrototypeInterface({ scenario, selection, updateSelection, totals }) {
         <div><span>เร็วที่สุด</span><strong>{totals.total_time} นาที</strong><small>{main?.mode}</small></div>
         <div><span>ถูกที่สุด</span><strong>{totals.total_cost}B</strong><small>{findOption(scenario, "first_mile", selection.selected_fm)?.mode}</small></div>
         <div><span>แนะนำ</span><strong>{totals.total_time} นาที / {totals.total_cost}B</strong><small>สมดุลเวลาและราคา</small></div>
-        <div><span>ระยะทางเดิน</span><strong>~{totals.walk_m} ม.</strong><small>First + Last mile</small></div>
+        <div><span>ระยะทาง FMLM</span><strong>~{totals.distance_m} ม.</strong><small>First + Last mile</small></div>
       </div>
       <div className="segmented">
         {["all", "fm", "main", "lm"].map((id) => (
@@ -967,7 +967,7 @@ function RatingPanel({ selection, updateSelection, totals, onContinue }) {
     <aside className="rating-panel">
       <div>
         <span>ตัวเลือกปัจจุบัน</span>
-        <strong>{totals.total_time} นาที · {totals.total_cost} บาท · เดิน ~{totals.walk_m} ม.</strong>
+        <strong>{totals.total_time} นาที · {totals.total_cost} บาท · FMLM ~{totals.distance_m} ม.</strong>
       </div>
       {postInterfaceQuestions.map((question, index) => (
         <RatingChoice
