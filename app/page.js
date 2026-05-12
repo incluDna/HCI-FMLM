@@ -502,6 +502,10 @@ function ConsentTutorial({ onStart }) {
     <section className="page consent-page">
       <div className="consent-card">
         <h1>แบบสำรวจประกอบการวิจัย การเข้าถึงระบบขนส่งช่วงต้นทางและปลายทางในกรุงเทพฯ</h1>
+        <div className="task-instruction">
+          <strong>คำแนะนำสำคัญ</strong>
+          <p>ในแต่ละสถานการณ์ กรุณาเลือกเส้นทางที่คุณอยากใช้มากที่สุดตามความต้องการของคุณเอง ไม่มีคำตอบที่ถูกหรือผิด</p>
+        </div>
         <div className="consent-grid">
           <section>
             <h2>วัตถุประสงค์</h2>
