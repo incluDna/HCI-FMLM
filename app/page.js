@@ -112,6 +112,7 @@ const finalComparativeQuestions = [
   }
 ];
 const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL || process.env.VITE_SHEET_URL || "";
+const studyClosed = process.env.NEXT_PUBLIC_STUDY_CLOSED === "true";
 
 const initialBackground = { freq: "", modes: [], appUsage: "", multiLegFamiliarity: "" };
 const initialSatisfaction = {
@@ -235,6 +236,10 @@ export default function StudyApp() {
   const [scenarioPool, setScenarioPool] = useState(scenarioDb);
 
   useEffect(() => {
+    if (studyClosed) {
+      setReady(true);
+      return;
+    }
     flushEventQueue();
     const saved = storageGet("fmlm_current_participant", null);
     if (saved?.participant_id) {
@@ -412,7 +417,9 @@ export default function StudyApp() {
     }
   }
 
-  if (!ready || !participant) return <main className="loading">Loading study...</main>;
+  if (!ready) return <main className="loading">Loading study...</main>;
+  if (studyClosed) return <ClosedStudy />;
+  if (!participant) return <main className="loading">Loading study...</main>;
 
   return (
     <main>
@@ -477,6 +484,17 @@ export default function StudyApp() {
         />
       )}
       {screen === "thanks" && <Thanks participant={participant} />}
+    </main>
+  );
+}
+
+function ClosedStudy() {
+  return (
+    <main>
+      <section className="page thanks closed-study">
+        <h1>แบบสำรวจนี้ปิดรับคำตอบแล้ว</h1>
+        <p>ผู้วิจัยขอขอบพระคุณทุกท่านที่ให้ความร่วมมือในการวิจัย</p>
+      </section>
     </main>
   );
 }

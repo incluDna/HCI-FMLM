@@ -1337,6 +1337,21 @@ main {
   text-align: center;
 }
 
+.closed-study {
+  max-width: 720px;
+}
+
+.closed-study h1 {
+  margin-bottom: 14px;
+}
+
+.closed-study p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
 .secondary-link {
   display: inline-flex;
   justify-content: center;
