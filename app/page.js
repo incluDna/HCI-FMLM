@@ -28,15 +28,15 @@ const RouteMap = dynamic(() => import("@/app/components/RouteMap"), { ssr: false
 const travelFreqOptions = ["ทุกวัน", "3–5 วันต่อสัปดาห์", "1–2 วันต่อสัปดาห์", "นาน ๆ ครั้ง"];
 const travelModes = [
   ["walk", "🚶", "เดิน"],
-  ["bts", "🚇", "BTS"],
-  ["mrt", "🚊", "MRT"],
-  ["bus", "🚌", "รถเมล์"],
+  ["bus", "🚌", "รถเมล์/ประจำทาง"],
+  ["van", "🚐", "รถตู้"],
+  ["songthaew", "🚗", "รถสองแถว"],
+  ["taxi", "🚕", "แท็กซี่"],
   ["moto", "🏍️", "วินมอเตอร์ไซค์"],
-  ["taxi", "🚕", "Taxi/Grab"],
-  ["boat", "⛵", "เรือ"],
-  ["car", "🚗", "รถยนต์ส่วนตัว"],
-  ["bike", "🚲", "จักรยาน"],
-  ["other", "➕", "อื่น ๆ"]
+  ["rental_bike", "🚲", "จักรยาน(เช่า)"],
+  ["private_vehicle", "🧍", "รถยนต์-จักรยาน-มอเตอร์ไซค์ส่วนตัว"],
+  ["electric_train", "🚇", "รถไฟฟ้า(ทุกค่าย)"],
+  ["boat", "⛵", "เรือ"]
 ];
 const appUsageOptions = ["บ่อยมาก", "บางครั้ง", "นาน ๆ ครั้ง", "ไม่เคยใช้"];
 const multiLegFamiliarityOptions = [
@@ -719,13 +719,14 @@ function ScenarioScreen({
 }) {
   const totals = computeTotals(scenario, selection);
   const appName = `แอป ${interfaceLabelText}`;
+  const appBadgeClass = `app-badge app-badge-${interfaceLabelText.toLowerCase()}`;
   return (
     <section className="scenario-page">
       <div className="scenario-head">
         <div>
           <p className="eyebrow">สถานการณ์ {scenarioIndex + 1}/{totalScenarios}</p>
           <h1>{scenario.origin} → {scenario.destination}</h1>
-          <p className="app-badge">{appName}</p>
+          <p className={appBadgeClass}>{appName}</p>
         </div>
       </div>
       {interfaceType === "baseline" ? (
