@@ -18,9 +18,9 @@ Keywords and Phrases: First-mile Last-mile, interface design, multimodal transit
 <img width="2880" height="3329" alt="screencapture-hci-fmlm-vercel-app-2026-05-13-04-02-26-2-93c5fslr_KrMsCGdz" src="https://github.com/user-attachments/assets/dde85cde-2f1d-4424-8df4-928aa862a9d0" />
 
 ### Authors
-- Maethaphan Ph. (6733211421@student.chula.ac.th)
-- Napasorn S. (6733118821@student.chula.ac.th)
-- Penpitcha P. (6733185821@student.chula.ac.th)
+- Maethaphan Ph. [(cu-email)](6733211421@student.chula.ac.th)
+- Napasorn S. [(cu-email)](6733118821@student.chula.ac.th)
+- Penpitcha P. [(cu-email)](6733185821@student.chula.ac.th)
 
 ### Professor
-- Assoc. Prof. Dr. Chutisant Kerdvibulvech (chutisant.ker@nida.ac.th)
+- Assoc. Prof. Dr. Chutisant Kerdvibulvech [(nida-email)](chutisant.ker@nida.ac.th)
